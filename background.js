@@ -55,6 +55,7 @@ browser.runtime.onInstalled.addListener(async () => {
 browser.runtime.onStartup.addListener(createMenus);
 
 function createMenus() {
+  if (!browser.contextMenus || !browser.contextMenus.create) return;
   try {
     browser.contextMenus.removeAll().then(() => {
       const items = [
@@ -79,26 +80,30 @@ function createMenus() {
   }
 }
 
-browser.contextMenus.onClicked.addListener((info, tab) => {
-  if (!tab || tab.id == null) return;
-  if (info.menuItemId === "selection") startCapture("selection", tab.id);
-  else startCapture(info.menuItemId, tab.id);
-});
+if (browser.contextMenus && browser.contextMenus.onClicked) {
+  browser.contextMenus.onClicked.addListener((info, tab) => {
+    if (!tab || tab.id == null) return;
+    if (info.menuItemId === "selection") startCapture("selection", tab.id);
+    else startCapture(info.menuItemId, tab.id);
+  });
+}
 
-browser.commands.onCommand.addListener(async (command) => {
-  const tab = await getActiveTab();
-  if (!tab) return;
-  const map = {
-    "capture-visible": "visible",
-    "capture-region": "region",
-    "capture-full": "full",
-    "capture-element": "element",
-    "capture-repeat": "repeat",
-    "capture-timer": "timer",
-  };
-  const mode = map[command];
-  if (mode) startCapture(mode, tab.id);
-});
+if (browser.commands && browser.commands.onCommand) {
+  browser.commands.onCommand.addListener(async (command) => {
+    const tab = await getActiveTab();
+    if (!tab) return;
+    const map = {
+      "capture-visible": "visible",
+      "capture-region": "region",
+      "capture-full": "full",
+      "capture-element": "element",
+      "capture-repeat": "repeat",
+      "capture-timer": "timer",
+    };
+    const mode = map[command];
+    if (mode) startCapture(mode, tab.id);
+  });
+}
 
 browser.runtime.onMessage.addListener((msg, sender) => {
   if (!msg || !msg.type) return;
@@ -300,7 +305,8 @@ async function startCapture(mode, tabId, opts = {}) {
 
   const overlayOrNative = async (send) => {
     try {
-      await injectOverlay(tabId);
+      const ok = await injectOverlay(tabId);
+      if (!ok) throw new Error("no overlay");
       await send();
     } catch (e) {
       notify("Снимаю окно", "На этой странице нельзя внедрить оверлей.");
@@ -336,8 +342,7 @@ async function startCapture(mode, tabId, opts = {}) {
     return;
   }
   if (mode === "video-frame") {
-    await injectOverlay(tabId);
-    await sendToTab(tabId, { type: "SS_VIDEO_FRAME" });
+    await overlayOrNative(() => sendToTab(tabId, { type: "SS_VIDEO_FRAME" }));
     return;
   }
   if (mode === "selection") {
@@ -365,19 +370,18 @@ async function startCapture(mode, tabId, opts = {}) {
     return;
   }
   if (mode === "region" || mode === "custom" || mode === "multi") {
+    const shot = await captureVisibleOrNative(tab);
     try {
-      const shot = await captureVisible(tab);
-      await injectOverlay(tabId);
+      const ok = await injectOverlay(tabId);
+      if (!ok) throw new Error("no overlay");
       await sendToTab(tabId, { type: "SS_REGION", dataUrl: shot.dataUrl, viewport: shot.viewport, multi: mode === "multi" });
     } catch (e) {
-      const shot = await captureVisibleOrNative(tab);
       await openRegionPicker(shot, { mode: "region", title: tab.title, url: tab.url, multi: mode === "multi" });
     }
     return;
   }
   if (mode === "element") {
-    await injectOverlay(tabId);
-    await sendToTab(tabId, { type: "SS_ELEMENT" });
+    await overlayOrNative(() => sendToTab(tabId, { type: "SS_ELEMENT" }));
   }
 }
 
@@ -1008,25 +1012,38 @@ async function uploadShot(dataUrl) {
 
 async function setBusy(on, label) {
   try {
+    if (!browser.action || !browser.action.setBadgeText) return;
     await browser.action.setBadgeBackgroundColor({ color: "#ff6a3d" });
     await browser.action.setBadgeText({ text: on ? (label ? label.slice(0, 4) : "…") : "" });
   } catch (_) {}
 }
 
-async function injectOverlay(tabId) {
+async function pingOverlay(tabId) {
   try {
     const ping = await sendToTab(tabId, { type: "SS_PING" });
-    if (ping && ping.ok) return;
-  } catch (_) {}
+    return !!(ping && ping.ok);
+  } catch (_) {
+    return false;
+  }
+}
+
+async function injectOverlay(tabId) {
+  if (await pingOverlay(tabId)) return true;
   try {
     await evalInTab(tabId, () => {
       try { delete window.__SS_OVERLAY__; } catch (_) {}
     });
   } catch (_) {}
-  await browser.scripting.executeScript({
-    target: { tabId },
-    files: ["shared/i18n.js", "capture/overlay.js"],
-  });
+  try {
+    await browser.scripting.executeScript({
+      target: { tabId },
+      files: ["shared/i18n.js", "capture/overlay.js"],
+    });
+  } catch (_) {
+    return false;
+  }
+  await sleep(60);
+  return pingOverlay(tabId);
 }
 
 async function openRegionPicker(shot, meta) {
@@ -1125,7 +1142,11 @@ function clamp(v, a, b) { return Math.max(a, Math.min(b, v)); }
 function uid() { return "ss_" + Date.now().toString(36) + "_" + Math.random().toString(36).slice(2, 8); }
 function sleep(ms) { return new Promise((r) => setTimeout(r, ms)); }
 function notify(title, message) {
-  browser.notifications.create({ type: "basic", iconUrl: "icons/icon-48.png", title, message });
+  try {
+    if (browser.notifications && browser.notifications.create) {
+      browser.notifications.create({ type: "basic", iconUrl: "icons/icon-48.png", title, message });
+    }
+  } catch (_) {}
 }
 
 function makeFilename(settings, ext, meta) {

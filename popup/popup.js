@@ -3,14 +3,37 @@ if (/Android/i.test(navigator.userAgent)) {
   if (document.body) document.body.classList.add("ss-mobile");
 }
 
+function friendly(e) {
+  const raw = e && e.message ? e.message : String(e || "Ошибка");
+  if (/Receiving end does not exist|Could not establish connection/i.test(raw)) {
+    return "Расширение не успело запуститься. Закройте меню и нажмите ещё раз. Если снова ошибка — в about:debugging нажмите «Обновить» у СкринСтудии.";
+  }
+  return raw;
+}
+
 function showErr(e) {
   const el = document.getElementById("err");
-  const text = e && e.message ? e.message : String(e || "Ошибка");
+  const text = friendly(e);
   if (el) {
     el.hidden = false;
     el.textContent = text;
   }
   try { alert(text); } catch (_) {}
+}
+
+async function sendBg(msg) {
+  let last;
+  for (let i = 0; i < 5; i++) {
+    try {
+      return await browser.runtime.sendMessage(msg);
+    } catch (e) {
+      last = e;
+      const s = String(e && e.message ? e.message : e);
+      if (!/Receiving end does not exist|Could not establish connection/i.test(s) || i === 4) throw e;
+      await new Promise((r) => setTimeout(r, 120 * (i + 1)));
+    }
+  }
+  throw last;
 }
 
 function isPageTab(t) {
@@ -42,7 +65,7 @@ async function runCapture(mode, btn) {
   if (btn) btn.disabled = true;
   try {
     const tabId = await resolveTabId();
-    await browser.runtime.sendMessage({ type: "SS_CAPTURE", mode, tabId });
+    await sendBg({ type: "SS_CAPTURE", mode, tabId });
     try { window.close(); } catch (_) {}
   } catch (e) {
     if (btn) btn.disabled = false;
@@ -56,12 +79,12 @@ document.querySelectorAll("[data-mode]").forEach((btn) => {
 
 document.getElementById("openEditor").addEventListener("click", async () => {
   const { lastCaptureId } = await browser.storage.local.get("lastCaptureId");
-  await browser.runtime.sendMessage({ type: "SS_OPEN_EDITOR", id: lastCaptureId });
+  await sendBg({ type: "SS_OPEN_EDITOR", id: lastCaptureId });
   try { window.close(); } catch (_) {}
 });
 
 document.getElementById("history").addEventListener("click", async () => {
-  await browser.runtime.sendMessage({ type: "SS_OPEN_HISTORY" });
+  await sendBg({ type: "SS_OPEN_HISTORY" });
   try { window.close(); } catch (_) {}
 });
 
