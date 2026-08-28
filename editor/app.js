@@ -10,7 +10,7 @@
   ];
   const EMOJI = ["⭐","🔥","✅","❌","⚠️","💡","❤️","👍","👎","📌","🎯","💬","✨","🚀","👀","🔒","📝","🎉","🧩","🧠","⚡","🌈","📎","🕒"];
   const TOOL_RU = {
-    select: "выбор", crop: "кадрирование", eyedropper: "пипетка",
+    select: "выбор", pan: "перемещение", crop: "кадрирование", eyedropper: "пипетка",
     pen: "перо", highlight: "маркер", line: "линия", arrow: "стрелка",
     rect: "прямоугольник", roundrect: "скругление", ellipse: "овал",
     triangle: "треугольник", text: "текст", callout: "выноска",
@@ -25,8 +25,8 @@
     selected: null,
     tool: "select",
     zoom: 1,
-    panX: 40,
-    panY: 40,
+    panX: 0,
+    panY: 0,
     adj: { brightness: 0, contrast: 0, saturate: 0, warmth: 0 },
     export: { border: 0, borderColor: "#000000", pad: 0, radius: 0, padColor: "#111111" },
     style: {
@@ -46,6 +46,7 @@
     history: new E.History(),
     drag: null,
     space: false,
+    viewTouched: false,
     filtered: null,
     filterKey: "",
   };
@@ -89,7 +90,8 @@
     state.tool = t;
     syncToolButtons();
     $("statTool").textContent = "Инструмент: " + (TOOL_RU[t] || t);
-    canvas.style.cursor = t === "select" ? "default" : t === "eyedropper" ? "crosshair" : "crosshair";
+    canvas.style.cursor = t === "pan" ? "grab" : t === "select" ? "default" : "crosshair";
+    if ($("btnHand")) $("btnHand").classList.toggle("active", t === "pan");
     if (t === "spotlight") {
       toast("Обведите важное: эта область останется светлой, остальное затемнится");
     }
@@ -269,7 +271,10 @@
     $("btnRedo").onclick = redo;
     $("btnZoomIn").onclick = () => zoomBy(1.15);
     $("btnZoomOut").onclick = () => zoomBy(1 / 1.15);
-    $("btnZoomFit").onclick = fit;
+    $("btnZoomFit").onclick = () => { state.viewTouched = false; fit(); };
+    if ($("btnHand")) {
+      $("btnHand").onclick = () => setTool(state.tool === "pan" ? "select" : "pan");
+    }
     $("btnCopy").onclick = () => copyOut();
     $("btnSave").onclick = () => saveOut();
     if ($("btnProps") && $("rightPanel")) {
@@ -293,6 +298,7 @@
     canvas.addEventListener("pointerdown", onDown);
     window.addEventListener("pointermove", onMove);
     window.addEventListener("pointerup", onUp);
+    window.addEventListener("pointercancel", onUp);
     window.addEventListener("keydown", onKey);
     window.addEventListener("keyup", (e) => {
       if (e.code === "Space") state.space = false;
@@ -369,6 +375,10 @@
     canvas.height = Math.round(r.height * dpr);
     canvas.style.width = r.width + "px";
     canvas.style.height = r.height + "px";
+    if (state.image && !state.viewTouched && r.width > 40 && r.height > 40) {
+      fit();
+      return;
+    }
     draw();
   }
 
@@ -379,26 +389,31 @@
     return { x: (x - state.panX) / state.zoom, y: (y - state.panY) / state.zoom };
   }
 
+  const pointers = new Map();
+
   function onWheel(e) {
     e.preventDefault();
+    state.viewTouched = true;
     const { x, y } = screenToWorld(e.clientX, e.clientY);
     const f = e.deltaY < 0 ? 1.12 : 1 / 1.12;
-    state.zoom = clamp(state.zoom * f, 0.08, 8);
+    state.zoom = clamp(state.zoom * f, 0.08, 16);
     state.panX = e.clientX - wrap.getBoundingClientRect().left - x * state.zoom;
     state.panY = e.clientY - wrap.getBoundingClientRect().top - y * state.zoom;
     $("zoomLabel").textContent = Math.round(state.zoom * 100) + "%";
     draw();
   }
   function zoomBy(f) {
-    state.zoom = clamp(state.zoom * f, 0.08, 8);
+    state.zoom = clamp(state.zoom * f, 0.08, 16);
     $("zoomLabel").textContent = Math.round(state.zoom * 100) + "%";
     draw();
   }
   function fit() {
     if (!state.image) return;
     const r = wrap.getBoundingClientRect();
-    const z = Math.min((r.width - 80) / state.image.width, (r.height - 80) / state.image.height);
-    state.zoom = clamp(z, 0.05, 4);
+    if (r.width < 32 || r.height < 32) return;
+    const pad = 16;
+    const z = Math.min((r.width - pad * 2) / state.image.width, (r.height - pad * 2) / state.image.height);
+    state.zoom = clamp(z, 0.02, 16);
     state.panX = (r.width - state.image.width * state.zoom) / 2;
     state.panY = (r.height - state.image.height * state.zoom) / 2;
     $("zoomLabel").textContent = Math.round(state.zoom * 100) + "%";
@@ -407,7 +422,30 @@
 
   function onDown(e) {
     if (!state.image) return;
-    if (e.button === 1 || state.space) {
+    try { canvas.setPointerCapture(e.pointerId); } catch (_) {}
+    pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    if (pointers.size === 2) {
+      const pts = [...pointers.values()];
+      const wr = wrap.getBoundingClientRect();
+      const mx = (pts[0].x + pts[1].x) / 2;
+      const my = (pts[0].y + pts[1].y) / 2;
+      const dist = Math.max(1, Math.hypot(pts[1].x - pts[0].x, pts[1].y - pts[0].y));
+      state.drag = {
+        kind: "pinch",
+        dist,
+        zoom: state.zoom,
+        wx: (mx - wr.left - state.panX) / state.zoom,
+        wy: (my - wr.top - state.panY) / state.zoom,
+      };
+      state.viewTouched = true;
+      e.preventDefault();
+      return;
+    }
+    if (pointers.size > 2) return;
+    if (e.button === 1 || state.space || state.tool === "pan") {
+      e.preventDefault();
+      state.viewTouched = true;
+      canvas.style.cursor = "grabbing";
       state.drag = { kind: "pan", x: e.clientX, y: e.clientY, panX: state.panX, panY: state.panY };
       return;
     }
@@ -580,6 +618,22 @@
   }
 
   function onMove(e) {
+    if (pointers.has(e.pointerId)) pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    if (state.drag && state.drag.kind === "pinch") {
+      if (pointers.size < 2) return;
+      const pts = [...pointers.values()];
+      const wr = wrap.getBoundingClientRect();
+      const mx = (pts[0].x + pts[1].x) / 2;
+      const my = (pts[0].y + pts[1].y) / 2;
+      const dist = Math.max(1, Math.hypot(pts[1].x - pts[0].x, pts[1].y - pts[0].y));
+      const z = clamp(state.drag.zoom * (dist / state.drag.dist), 0.08, 16);
+      state.zoom = z;
+      state.panX = mx - wr.left - state.drag.wx * z;
+      state.panY = my - wr.top - state.drag.wy * z;
+      $("zoomLabel").textContent = Math.round(state.zoom * 100) + "%";
+      draw();
+      return;
+    }
     const p = screenToWorld(e.clientX, e.clientY);
     $("statXY").textContent = state.image ? `${Math.round(p.x)}, ${Math.round(p.y)}` : "";
     if (!state.drag) return;
@@ -648,7 +702,13 @@
     }
   }
 
-  function onUp() {
+  function onUp(e) {
+    if (e && e.pointerId != null) pointers.delete(e.pointerId);
+    if (state.drag && state.drag.kind === "pinch") {
+      if (pointers.size < 2) state.drag = null;
+      return;
+    }
+    if (state.tool === "pan") canvas.style.cursor = "grab";
     if (!state.drag) return;
     if (state.drag.kind === "create") {
       const o = getSelected();
@@ -1034,6 +1094,7 @@
     else if (e.ctrlKey && key === "d") { e.preventDefault(); duplicate(); }
     else if (e.key === "Delete" || e.key === "Backspace") { e.preventDefault(); delSelected(); }
     else if (key === "v") setTool("select");
+    else if (key === "g") setTool(state.tool === "pan" ? "select" : "pan");
     else if (key === "c" && !e.ctrlKey) setTool("crop");
     else if (key === "p") setTool("pen");
     else if (key === "h") setTool("highlight");
@@ -1077,7 +1138,13 @@
           state.nextStep = 1;
           state.history = new E.History();
           snapshot(true);
+          state.viewTouched = false;
           fit();
+          requestAnimationFrame(() => {
+            requestAnimationFrame(() => {
+              if (!state.viewTouched) fit();
+            });
+          });
         } else {
           draw();
         }

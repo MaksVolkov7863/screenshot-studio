@@ -36,6 +36,7 @@
     <aside class="left" id="toolbar">
       <div class="group-label">Выбор</div>
       <button class="tool active" data-tool="select" title="Выбор (V)"><svg viewBox="0 0 24 24"><path d="M5 4 l11 7 -5 1 2 7 -3 1 -2-7 -3 5z"/></svg></button>
+      <button class="tool" data-tool="pan" title="Перемещение (рука, свайп, щипок)"><svg viewBox="0 0 24 24"><path d="M8 11v-3a1.5 1.5 0 0 1 3 0v3"/><path d="M11 10V7a1.5 1.5 0 0 1 3 0v4"/><path d="M14 10.5V8a1.5 1.5 0 0 1 3 0v5"/><path d="M17 13v-2a1.5 1.5 0 0 1 3 0v5.5a5.5 5.5 0 0 1-11 0V11a1.5 1.5 0 0 1 3 0v2"/></svg></button>
       <button class="tool" data-tool="crop" title="Кадрировать (C)"><svg viewBox="0 0 24 24"><path d="M6 3v15h15"/><path d="M3 6h15v15"/></svg></button>
       <button class="tool" data-tool="eyedropper" title="Пипетка (I)"><svg viewBox="0 0 24 24"><path d="M15 3 l6 6 -9 9 H6 v-6 z"/><path d="M12 6 l6 6"/></svg></button>
 
@@ -69,6 +70,9 @@
 
     <div class="stage-wrap" id="stageWrap">
       <canvas id="stage"></canvas>
+      <button type="button" class="fab-hand" id="btnHand" title="Перемещение полотна">
+        <svg viewBox="0 0 24 24"><path d="M8 11v-3a1.5 1.5 0 0 1 3 0v3"/><path d="M11 10V7a1.5 1.5 0 0 1 3 0v4"/><path d="M14 10.5V8a1.5 1.5 0 0 1 3 0v5"/><path d="M17 13v-2a1.5 1.5 0 0 1 3 0v5.5a5.5 5.5 0 0 1-11 0V11a1.5 1.5 0 0 1 3 0v2"/></svg>
+      </button>
       <div class="empty live" id="empty">
         <div class="drop">
           <h1>Нет снимка</h1>
