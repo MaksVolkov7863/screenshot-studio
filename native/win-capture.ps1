@@ -23,7 +23,17 @@ public class FxCap {
   public struct POINT { public int X, Y; }
 }
 "@
-[FxCap]::SetProcessDPIAware() | Out-Null
+try {
+  Add-Type @"
+using System.Runtime.InteropServices;
+public class DpiA {
+  [DllImport("Shcore.dll")] public static extern int SetProcessDpiAwareness(int v);
+}
+"@
+  [DpiA]::SetProcessDpiAwareness(2) | Out-Null
+} catch {
+  [FxCap]::SetProcessDPIAware() | Out-Null
+}
 
 function Get-Class([IntPtr]$h) {
     $sb = New-Object System.Text.StringBuilder 256

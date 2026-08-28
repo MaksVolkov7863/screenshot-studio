@@ -882,6 +882,8 @@
 
   function ensureFiltered() {
     if (!state.image) return null;
+    const a = state.adj || {};
+    if (!a.brightness && !a.contrast && !a.saturate && !a.warmth) return state.image;
     const key = JSON.stringify(state.adj) + state.image.src.slice(-24);
     if (state.filtered && state.filterKey === key) return state.filtered;
     state.filtered = E.filterImage(state.image, state.adj);
@@ -901,7 +903,11 @@
     ctx.save();
     ctx.translate(state.panX, state.panY);
     ctx.scale(state.zoom, state.zoom);
+    const sharp = state.zoom * dpr >= 0.999;
+    ctx.imageSmoothingEnabled = !sharp;
+    ctx.imageSmoothingQuality = sharp ? "low" : "high";
     ctx.drawImage(filtered, 0, 0);
+    ctx.imageSmoothingEnabled = true;
     if (window.SSHooks && window.SSHooks.afterImage) window.SSHooks.afterImage(ctx, filtered);
 
     E.drawSpotlights(ctx, state.objects, filtered.width, filtered.height);
