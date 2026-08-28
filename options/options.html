@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <title>СкринСтудия — настройки</title>
+  <link rel="stylesheet" href="options.css">
+</head>
+<body>
+  <main>
+    <h1>СкринСтудия</h1>
+    <p class="lead">Захват, имена файлов, загрузка и тихий режим.</p>
+
+    <label>После снимка
+      <select id="afterCapture">
+        <option value="editor">Открыть редактор</option>
+        <option value="copy">Тихий режим — в буфер (превью)</option>
+        <option value="download">Сохранить файл</option>
+        <option value="pin">Пин поверх окон</option>
+      </select>
+    </label>
+    <label>Формат
+      <select id="format">
+        <option value="png">PNG</option>
+        <option value="jpeg">JPEG</option>
+        <option value="webp">WebP</option>
+      </select>
+    </label>
+    <label>Качество JPEG / WebP
+      <input id="jpegQuality" type="range" min="0.5" max="1" step="0.01">
+      <span id="qVal"></span>
+    </label>
+    <label>Масштаб экспорта
+      <select id="scaleExport">
+        <option value="screen">Как на экране (с учётом DPR)</option>
+        <option value="css">1× CSS-пиксели</option>
+        <option value="2x">Принудительно 2×</option>
+        <option value="3x">Принудительно 3×</option>
+      </select>
+    </label>
+    <label class="check"><input type="checkbox" id="hideFixed"> Прятать sticky при полном снимке</label>
+    <label class="check"><input type="checkbox" id="hideScrollbars"> Прятать полосы прокрутки</label>
+    <label class="check"><input type="checkbox" id="includeCursor"> Рисовать курсор на снимке</label>
+    <label class="check"><input type="checkbox" id="includeClicks"> Красный кружок клика</label>
+    <label class="check"><input type="checkbox" id="autoFolder"> Папка Screenshots/домен</label>
+    <label class="check"><input type="checkbox" id="quietToast"> Уведомление после тихого копирования</label>
+    <label>Задержка таймера по умолчанию, мс
+      <input id="delayMs" type="number" min="1000" max="20000" step="500">
+    </label>
+    <label>Имя файла
+      <input id="filenamePattern" type="text">
+      <small>{site} {title} {date} {time} {mode}</small>
+    </label>
+    <label>ImgBB API key
+      <input id="imgbbKey" type="password" placeholder="для загрузки и ссылки">
+    </label>
+    <label>Свой URL загрузки (POST file)
+      <input id="uploadUrl" type="url" placeholder="https://…">
+    </label>
+    <label>GitHub repo для issue
+      <input id="githubRepo" type="text" placeholder="owner/repo">
+    </label>
+    <label>Webhook (Notion / Jira / свой)
+      <input id="webhookUrl" type="url">
+    </label>
+    <h2>Windows OCR</h2>
+    <p class="lead" id="ocrStatus">Проверяю native-host…</p>
+    <p class="lead">Один раз запустите <code>native\install-ocr-host.ps1</code> в папке расширения, затем перезапустите Firefox. Текст читает встроенный движок Windows 10/11, без интернета.</p>
+    <button type="button" id="ocrPing">Проверить Windows OCR</button>
+    <button id="save">Сохранить</button>
+    <p id="ok" hidden>Сохранено</p>
+  </main>
+  <script src="options.js"></script>
+</body>
+</html>

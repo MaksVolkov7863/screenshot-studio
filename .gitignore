@@ -1,0 +1,13 @@
+dist/
+*.xpi
+*.zip
+__pycache__/
+*.pyc
+*.pyo
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.log
+native/_*.png
+native/_*.ps1

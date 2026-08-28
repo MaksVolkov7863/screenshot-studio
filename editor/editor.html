@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <title>СкринСтудия — редактор</title>
+  <link rel="stylesheet" href="editor.css">
+  <link rel="icon" href="../icons/icon.svg">
+</head>
+<body>
+  <div class="app">
+    <header class="top">
+      <div class="brand">
+        <img src="../icons/icon.svg" alt="">
+        СкринСтудия
+      </div>
+      <div class="sep"></div>
+      <button class="btn ghost" id="btnUndo" title="Ctrl+Z">↩ Отмена</button>
+      <button class="btn ghost" id="btnRedo" title="Ctrl+Y">↪ Повтор</button>
+      <div class="sep"></div>
+      <button class="btn ghost" id="btnZoomOut">−</button>
+      <span id="zoomLabel">100%</span>
+      <button class="btn ghost" id="btnZoomIn">+</button>
+      <button class="btn ghost" id="btnZoomFit">По размеру</button>
+      <div class="grow"></div>
+      <button class="btn" id="btnCopy" title="Ctrl+Shift+C">Копировать</button>
+      <select id="fmt">
+        <option value="png">PNG</option>
+        <option value="jpeg">JPEG</option>
+        <option value="webp">WebP</option>
+      </select>
+      <button class="btn primary" id="btnSave" title="Ctrl+S">Сохранить</button>
+    </header>
+
+    <aside class="left" id="toolbar">
+      <div class="group-label">Выбор</div>
+      <button class="tool active" data-tool="select" title="Выбор (V)"><svg viewBox="0 0 24 24"><path d="M5 4 l11 7 -5 1 2 7 -3 1 -2-7 -3 5z"/></svg></button>
+      <button class="tool" data-tool="crop" title="Кадрировать (C)"><svg viewBox="0 0 24 24"><path d="M6 3v15h15"/><path d="M3 6h15v15"/></svg></button>
+      <button class="tool" data-tool="eyedropper" title="Пипетка (I)"><svg viewBox="0 0 24 24"><path d="M15 3 l6 6 -9 9 H6 v-6 z"/><path d="M12 6 l6 6"/></svg></button>
+
+      <div class="group-label">Линии</div>
+      <button class="tool" data-tool="pen" title="Перо (P)"><svg viewBox="0 0 24 24"><path d="M4 20 l2-8 11-8 3 3 -8 11z"/></svg></button>
+      <button class="tool" data-tool="highlight" title="Маркер (H)"><svg viewBox="0 0 24 24"><path d="M4 17h16"/><path d="M7 17 l8-10 3 3 -8 10z"/></svg></button>
+      <button class="tool" data-tool="laser" title="Лазер"><svg viewBox="0 0 24 24"><path d="M4 20 L20 4"/><circle cx="20" cy="4" r="2"/></svg></button>
+      <button class="tool" data-tool="line" title="Линия (L)"><svg viewBox="0 0 24 24"><path d="M5 19 L19 5"/></svg></button>
+      <button class="tool" data-tool="arrow" title="Стрелка (A)"><svg viewBox="0 0 24 24"><path d="M5 19 L17 7"/><path d="M10 7h7v7"/></svg></button>
+
+      <div class="group-label">Фигуры</div>
+      <button class="tool" data-tool="rect" title="Прямоугольник (R)"><svg viewBox="0 0 24 24"><rect x="5" y="6" width="14" height="12"/></svg></button>
+      <button class="tool" data-tool="roundrect" title="Скруглённый"><svg viewBox="0 0 24 24"><rect x="5" y="6" width="14" height="12" rx="4"/></svg></button>
+      <button class="tool" data-tool="ellipse" title="Овал (O)"><svg viewBox="0 0 24 24"><ellipse cx="12" cy="12" rx="8" ry="6"/></svg></button>
+      <button class="tool" data-tool="triangle" title="Треугольник"><svg viewBox="0 0 24 24"><path d="M12 5 L20 19 H4 Z"/></svg></button>
+
+      <div class="group-label">Текст</div>
+      <button class="tool" data-tool="text" title="Текст (T)"><svg viewBox="0 0 24 24"><path d="M5 7h14"/><path d="M12 7v12"/><path d="M8 19h8"/></svg></button>
+      <button class="tool" data-tool="callout" title="Выноска"><svg viewBox="0 0 24 24"><path d="M5 6h14v9H9l-4 4z"/></svg></button>
+      <button class="tool" data-tool="step" title="Нумерация"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><path d="M10 8h3v8"/></svg></button>
+      <button class="tool" data-tool="note" title="Стикер"><svg viewBox="0 0 24 24"><path d="M7 5h10v10l-4 4H7z"/><path d="M13 19v-4h4"/></svg></button>
+      <button class="tool" data-tool="stamp" title="Стикер-эмодзи"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><path d="M8 14c1.2 2 6.8 2 8 0"/><circle cx="9" cy="10" r=".8" fill="currentColor" stroke="none"/><circle cx="15" cy="10" r=".8" fill="currentColor" stroke="none"/></svg></button>
+
+      <div class="group-label">Приватность</div>
+      <button class="tool" data-tool="blur" title="Размытие (B)"><svg viewBox="0 0 24 24"><circle cx="8" cy="10" r="3"/><circle cx="14" cy="14" r="4"/><circle cx="17" cy="8" r="2"/></svg></button>
+      <button class="tool" data-tool="pixelate" title="Пикселизация"><svg viewBox="0 0 24 24"><path d="M5 5h4v4H5zM10 5h4v4h-4zM15 5h4v4h-4zM5 10h4v4H5zM15 10h4v4h-4zM5 15h4v4H5zM10 15h4v4h-4zM15 15h4v4h-4z"/></svg></button>
+      <button class="tool" data-tool="redact" title="Замазать"><svg viewBox="0 0 24 24"><rect x="4" y="8" width="16" height="8"/></svg></button>
+      <button class="tool" data-tool="spotlight" title="Прожектор"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="5"/><path d="M12 3v2M12 19v2M3 12h2M19 12h2"/></svg></button>
+      <button class="tool" data-tool="magnify" title="Лупа"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="6"/><path d="M16 16l4 4"/></svg></button>
+    </aside>
+
+    <div class="stage-wrap" id="stageWrap">
+      <canvas id="stage"></canvas>
+      <div class="empty live" id="empty">
+        <div class="drop">
+          <h1>Нет снимка</h1>
+          <p>Откройте всплывающее окно расширения и сделайте скриншот<br>или перетащите сюда изображение, либо Ctrl+V</p>
+          <button class="btn primary" id="btnOpen" style="pointer-events:auto">Открыть файл</button>
+        </div>
+      </div>
+    </div>
+
+    <aside class="right">
+      <h3>Цвет</h3>
+      <div class="swatches" id="swatches"></div>
+      <div class="row"><label>Обводка</label><input type="color" id="stroke" value="#ff3b30"></div>
+      <div class="row"><label>Заливка</label><input type="color" id="fill" value="#ff3b30"></div>
+      <div class="row"><label>Толщина <span id="swVal">4</span></label><input type="range" id="strokeWidth" min="1" max="48" value="4"></div>
+      <div class="row"><label>Прозрачность <span id="opVal">100%</span></label><input type="range" id="opacity" min="5" max="100" value="100"></div>
+      <div class="row"><label>Пунктир</label>
+        <select id="dash">
+          <option value="">Сплошная</option>
+          <option value="8,6">Пунктир</option>
+          <option value="2,6">Точки</option>
+          <option value="16,6,4,6">Штрих-точка</option>
+        </select>
+      </div>
+      <div class="row"><label>Тень</label><input type="checkbox" id="shadow"></div>
+      <div class="row"><label>Две стрелки</label><input type="checkbox" id="twoWay"></div>
+      <div class="row"><label>Скругление</label><input type="range" id="radius" min="0" max="80" value="16"></div>
+
+      <h3>Текст</h3>
+      <div class="row"><label>Кегль</label><input type="number" id="fontSize" min="10" max="160" value="28"></div>
+      <div class="row"><label>Шрифт</label>
+        <select id="fontFamily">
+          <option>Segoe UI</option>
+          <option>Arial</option>
+          <option>Georgia</option>
+          <option>Times New Roman</option>
+          <option>Consolas</option>
+          <option>Comic Sans MS</option>
+          <option>Impact</option>
+          <option>Trebuchet MS</option>
+          <option>Verdana</option>
+        </select>
+      </div>
+      <div class="row">
+        <button class="btn" id="bold">Ж</button>
+        <button class="btn" id="italic">К</button>
+        <select id="align">
+          <option value="left">Слева</option>
+          <option value="center">Центр</option>
+          <option value="right">Справа</option>
+        </select>
+      </div>
+
+      <div id="panelSpot" hidden>
+        <h3>Прожектор</h3>
+        <p class="hint-mini">Нарисуйте область, которую нужно выделить. Вокруг она затемнится, внутри снимок останется как есть.</p>
+        <div class="row"><label>Затемнение <span id="spotDimVal">68%</span></label><input type="range" id="spotDim" min="20" max="92" value="68"></div>
+        <div class="row"><label>Цвет тени</label><input type="color" id="spotColor" value="#000000"></div>
+        <div class="row"><label>Мягкий край <span id="spotFeatherVal">28</span></label><input type="range" id="spotFeather" min="0" max="80" value="28"></div>
+        <div class="row"><label>Форма</label>
+          <select id="spotShape">
+            <option value="ellipse">Овал</option>
+            <option value="roundrect">Скругление</option>
+            <option value="rect">Прямоугольник</option>
+          </select>
+        </div>
+        <p class="hint-mini">Обводка и толщина на панели выше — кольцо вокруг светлого окна.</p>
+      </div>
+
+      <div id="panelMag" hidden>
+        <h3>Лупа</h3>
+        <p class="hint-mini">Оранжевый прицел — какой участок приближать. Потяните его, чтобы смотреть не туда, где стоит стекло.</p>
+        <div class="row"><label>Кратность <span id="magZoomVal">2.5×</span></label></div>
+        <div class="row">
+          <input type="range" id="zoomObj" min="1.1" max="12" step="0.1" value="2.5">
+          <input type="number" id="zoomObjNum" min="1.1" max="12" step="0.1" value="2.5">
+        </div>
+        <div class="row"><label>Форма стекла</label>
+          <select id="magShape">
+            <option value="ellipse">Круг / овал</option>
+            <option value="roundrect">Скругление</option>
+            <option value="rect">Прямоугольник</option>
+          </select>
+        </div>
+        <div class="row"><label>Эффект</label>
+          <select id="magEffect">
+            <option value="none">Без эффекта</option>
+            <option value="glass">Стекло</option>
+            <option value="sharp">Резкость</option>
+            <option value="pixel">Пиксели (чётко)</option>
+            <option value="saturate">Сочность</option>
+            <option value="warm">Теплый</option>
+            <option value="cool">Холодный</option>
+            <option value="outline">Контур</option>
+            <option value="invert">Инверсия</option>
+          </select>
+        </div>
+        <div class="row"><label>Контраст внутри <span id="magContrastVal">10</span></label><input type="range" id="magContrast" min="-40" max="80" value="10"></div>
+        <div class="row"><label>Мягкий край <span id="magFeatherVal">0</span></label><input type="range" id="magFeather" min="0" max="60" value="0"></div>
+        <div class="row"><label>Следовать за стеклом</label><input type="checkbox" id="magFollow" checked></div>
+        <div class="row"><label>Рамка участка</label><input type="checkbox" id="magSource" checked></div>
+        <div class="row"><label>Линия к участку</label><input type="checkbox" id="magLeader" checked></div>
+        <div class="row"><label>Сетка пикселей</label><input type="checkbox" id="magGrid"></div>
+        <button class="btn" id="magResetSrc">Прицел в центр стекла</button>
+      </div>
+
+      <h3>Эффекты объекта</h3>
+      <div class="row"><label>Размытие</label><input type="range" id="blur" min="2" max="40" value="12"></div>
+      <div class="row"><label>Пиксель</label><input type="range" id="block" min="4" max="48" value="12"></div>
+
+      <h3>Стикеры</h3>
+      <div class="stamps" id="stamps"></div>
+
+      <h3>Коррекция снимка</h3>
+      <div class="row"><label>Яркость <span id="brVal">0</span></label><input type="range" id="brightness" min="-60" max="60" value="0"></div>
+      <div class="row"><label>Контраст <span id="ctVal">0</span></label><input type="range" id="contrast" min="-60" max="60" value="0"></div>
+      <div class="row"><label>Насыщенность <span id="saVal">0</span></label><input type="range" id="saturate" min="-100" max="100" value="0"></div>
+      <div class="row"><label>Теплота <span id="waVal">0</span></label><input type="range" id="warmth" min="-80" max="80" value="0"></div>
+      <button class="btn" id="resetAdj">Сбросить коррекцию</button>
+
+      <h3>Кадр на экспорте</h3>
+      <div class="row"><label>Рамка</label><input type="range" id="border" min="0" max="40" value="0"></div>
+      <div class="row"><label>Цвет рамки</label><input type="color" id="borderColor" value="#000000"></div>
+      <div class="row"><label>Поля</label><input type="range" id="pad" min="0" max="80" value="0"></div>
+      <div class="row"><label>Скругление кадра</label><input type="range" id="outRadius" min="0" max="48" value="0"></div>
+
+      <h3>Слой</h3>
+      <div class="row">
+        <button class="btn" id="btnUp">Выше</button>
+        <button class="btn" id="btnDown">Ниже</button>
+      </div>
+      <div class="row">
+        <button class="btn" id="btnDup">Дублировать</button>
+        <button class="btn" id="btnDel">Удалить</button>
+      </div>
+      <div class="row">
+        <button class="btn" id="btnFlipH">Отразить Г</button>
+        <button class="btn" id="btnFlipV">Отразить В</button>
+      </div>
+      <div class="row">
+        <button class="btn" id="btnRotL">↺ 90°</button>
+        <button class="btn" id="btnRotR">↻ 90°</button>
+      </div>
+    </aside>
+
+    <footer class="status">
+      <span id="statSize">—</span>
+      <span id="statTool">Инструмент: выбор</span>
+      <span id="statXY"></span>
+      <span class="grow"></span>
+      <span>Ctrl+Z отмена · Delete удалить · Колёсико масштаб · Пробел панорама</span>
+    </footer>
+  </div>
+  <input type="file" id="file" accept="image/*" hidden>
+  <textarea id="textEdit" class="text-edit" hidden></textarea>
+  <div class="toast" id="toast"></div>
+  <script src="../shared/idb.js"></script>
+  <script src="../shared/pdf.js"></script>
+  <script src="../shared/i18n.js"></script>
+  <script src="engine.js"></script>
+  <script src="app.js"></script>
+  <script src="features.js"></script>
+</body>
+</html>

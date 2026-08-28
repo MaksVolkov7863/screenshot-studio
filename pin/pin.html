@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <title>Пин</title>
+  <style>
+    html, body { margin: 0; background: #111; height: 100%; overflow: hidden; }
+    img { max-width: 100%; max-height: calc(100vh - 36px); display: block; margin: 0 auto; }
+    .bar {
+      height: 36px; display: flex; gap: 8px; align-items: center; padding: 0 8px;
+      background: #1b2330; color: #eef3fb; font: 12px/1 Segoe UI, sans-serif;
+    }
+    button { background: #2a3546; color: #fff; border: 0; border-radius: 8px; padding: 6px 10px; cursor: pointer; }
+  </style>
+</head>
+<body>
+  <div class="bar">
+    <span>Пин</span>
+    <button id="copy">Копировать</button>
+    <button id="edit">Редактор</button>
+    <button id="close">Закрыть</button>
+  </div>
+  <img id="img" alt="">
+  <script src="../shared/idb.js"></script>
+  <script src="pin.js"></script>
+</body>
+</html>

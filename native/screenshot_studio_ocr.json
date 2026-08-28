@@ -1,0 +1,7 @@
+{
+  "name": "screenshot_studio_ocr",
+  "description": "Windows OCR for Screenshot Studio",
+  "path": "REPLACE_WITH_ABSOLUTE_PATH_TO_ocr-host.cmd",
+  "type": "stdio",
+  "allowed_extensions": ["screenshot-studio@nikita.dev"]
+}

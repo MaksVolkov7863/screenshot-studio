@@ -1,0 +1,13 @@
+{
+  "extensionName": { "message": "Screenshot Studio" },
+  "extensionShortName": { "message": "Shot Studio" },
+  "extensionDescription": {
+    "message": "Capture a full page, region, element or the visible viewport, then annotate like a pro screenshot tool."
+  },
+  "cmdVisible": { "message": "Capture visible area" },
+  "cmdRegion": { "message": "Capture selected region" },
+  "cmdFull": { "message": "Capture full page" },
+  "cmdElement": { "message": "Capture element" },
+  "cmdRepeat": { "message": "Repeat last capture" },
+  "cmdTimer": { "message": "Capture timer" }
+}

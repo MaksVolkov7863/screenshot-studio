@@ -1,0 +1,13 @@
+{
+  "extensionName": { "message": "СкринСтудия" },
+  "extensionShortName": { "message": "СкринСтудия" },
+  "extensionDescription": {
+    "message": "Скриншоты всей страницы, области, элемента или видимого экрана и мощный редактор аннотаций."
+  },
+  "cmdVisible": { "message": "Снимок видимой области" },
+  "cmdRegion": { "message": "Снимок выделенной области" },
+  "cmdFull": { "message": "Снимок всей страницы" },
+  "cmdElement": { "message": "Снимок элемента" },
+  "cmdRepeat": { "message": "Повторить последний захват" },
+  "cmdTimer": { "message": "Таймер захвата" }
+}
