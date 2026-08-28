@@ -168,7 +168,7 @@ function isRestricted(url) {
 }
 
 async function captureNativeWindow() {
-  await sleep(450);
+  await sleep(500);
   try {
     const res = await browser.runtime.sendNativeMessage("screenshot_studio_ocr", { action: "capture" });
     if (!res || !res.ok || !res.dataUrl) {
