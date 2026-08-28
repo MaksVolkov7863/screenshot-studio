@@ -23,6 +23,30 @@ const DEFAULTS = {
 
 let abortCapture = false;
 let lastMode = "region";
+let _plat = null;
+
+async function plat() {
+  if (_plat) return _plat;
+  try {
+    _plat = await browser.runtime.getPlatformInfo();
+  } catch (_) {
+    _plat = { os: "unknown" };
+  }
+  _plat.mobile = _plat.os === "android";
+  return _plat;
+}
+async function isMobile() {
+  return (await plat()).mobile;
+}
+async function openExtUi(url, winOpts) {
+  if (await isMobile()) return browser.tabs.create({ url });
+  if (winOpts) {
+    try {
+      return await browser.windows.create({ url, ...winOpts });
+    } catch (_) {}
+  }
+  return browser.tabs.create({ url });
+}
 
 browser.runtime.onInstalled.addListener(async () => {
   await ensureDefaults();
@@ -180,6 +204,11 @@ function isRestricted(url) {
 }
 
 async function captureNativeWindow() {
+  if (await isMobile()) {
+    throw new Error(
+      "На Firefox для Android защищённые страницы (about:, магазины Mozilla) снять нельзя — так устроен браузер."
+    );
+  }
   await sleep(80);
   try {
     const res = await browser.runtime.sendNativeMessage("screenshot_studio_ocr", { action: "capture" });
@@ -719,20 +748,12 @@ async function openPin(id) {
     width: Math.max(280, w),
     height: Math.max(200, h),
   };
-  try {
-    await browser.windows.create({ ...opts, alwaysOnTop: true });
-  } catch (_) {
-    await browser.windows.create(opts);
-  }
+  await openExtUi(opts.url, { type: "popup", width: opts.width, height: opts.height, alwaysOnTop: true });
 }
 
 async function openQuiet(id) {
   const url = browser.runtime.getURL(`quiet/quiet.html?id=${encodeURIComponent(id)}`);
-  try {
-    await browser.windows.create({ url, type: "popup", width: 360, height: 220 });
-  } catch (_) {
-    await browser.tabs.create({ url });
-  }
+  await openExtUi(url, { type: "popup", width: 360, height: 220 });
 }
 
 async function captureVisible(tab) {
@@ -981,11 +1002,7 @@ async function injectOverlay(tabId) {
 async function openRegionPicker(shot, meta) {
   const id = await storeShot(shot, { ...meta, pendingRegion: true });
   const url = browser.runtime.getURL(`capture/picker.html?id=${encodeURIComponent(id)}`);
-  try {
-    await browser.windows.create({ url, type: "popup", state: "maximized" });
-  } catch (_) {
-    await browser.tabs.create({ url });
-  }
+  await openExtUi(url, { type: "popup", state: "maximized" });
 }
 
 async function finishPicker(msg) {

@@ -2,6 +2,7 @@
 <html lang="ru">
 <head>
   <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>СкринСтудия — редактор</title>
   <link rel="stylesheet" href="editor.css">
   <link rel="icon" href="../icons/icon.svg">
@@ -22,6 +23,7 @@
       <button class="btn ghost" id="btnZoomIn">+</button>
       <button class="btn ghost" id="btnZoomFit">По размеру</button>
       <div class="grow"></div>
+      <button class="btn ghost mobile-only" id="btnProps" type="button">Стиль</button>
       <button class="btn" id="btnCopy" title="Ctrl+Shift+C">Копировать</button>
       <select id="fmt">
         <option value="png">PNG</option>
@@ -76,7 +78,7 @@
       </div>
     </div>
 
-    <aside class="right">
+    <aside class="right" id="rightPanel">
       <h3>Цвет</h3>
       <div class="swatches" id="swatches"></div>
       <div class="row"><label>Обводка</label><input type="color" id="stroke" value="#ff3b30"></div>
@@ -217,7 +219,8 @@
       <span id="statTool">Инструмент: выбор</span>
       <span id="statXY"></span>
       <span class="grow"></span>
-      <span>Ctrl+Z отмена · Delete удалить · Колёсико масштаб · Пробел панорама</span>
+      <span class="desktop-only">Ctrl+Z отмена · Delete удалить · Колёсико масштаб · Пробел панорама</span>
+      <span class="mobile-only">Инструменты внизу · Стиль — цвет и толщина</span>
     </footer>
   </div>
   <input type="file" id="file" accept="image/*" hidden>
@@ -227,6 +230,7 @@
   <script src="../shared/idb.js"></script>
   <script src="../shared/pdf.js"></script>
   <script src="../shared/i18n.js"></script>
+  <script src="../shared/platform.js"></script>
   <script src="engine.js"></script>
   <script src="app.js"></script>
   <script src="features.js"></script>

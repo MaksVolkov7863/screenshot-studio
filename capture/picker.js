@@ -123,8 +123,11 @@
     window.close();
   }
 
-  canvas.addEventListener("mousedown", (e) => {
-    if (e.button !== 0 || !img) return;
+  canvas.addEventListener("pointerdown", (e) => {
+    if (!img) return;
+    if (e.pointerType === "mouse" && e.button !== 0) return;
+    e.preventDefault();
+    try { canvas.setPointerCapture(e.pointerId); } catch (_) {}
     const p = cssToImage(e);
     drag = { a: p, b: { ...p } };
     if (!adding) {
@@ -132,7 +135,7 @@
       bar.hidden = true;
     }
   });
-  window.addEventListener("mousemove", (e) => {
+  window.addEventListener("pointermove", (e) => {
     if (!img) return;
     hover = cssToImage(e);
     if (drag) {
@@ -147,7 +150,7 @@
     }
     paint();
   });
-  window.addEventListener("mouseup", () => {
+  const endPick = () => {
     if (!drag || !img) return;
     const n = norm(drag.a, drag.b);
     drag = null;
@@ -163,7 +166,9 @@
     adding = false;
     paint();
     placeBar(n);
-  });
+  };
+  window.addEventListener("pointerup", endPick);
+  window.addEventListener("pointercancel", endPick);
   window.addEventListener("keydown", (e) => {
     if (e.key === "Escape") {
       e.preventDefault();

@@ -26,7 +26,7 @@
     :host, * { box-sizing: border-box; font-family: "Segoe UI", system-ui, sans-serif; }
     .layer { position: fixed; inset: 0; z-index: 2147483646; }
     .freeze { position: fixed; inset: 0; width: 100vw; height: 100vh; object-fit: fill; pointer-events: none; }
-    canvas.hud { position: fixed; inset: 0; width: 100vw; height: 100vh; cursor: crosshair; }
+    canvas.hud { position: fixed; inset: 0; width: 100vw; height: 100vh; cursor: crosshair; touch-action: none; }
     .hint {
       position: fixed; left: 50%; top: 14px; transform: translateX(-50%);
       background: rgba(12,16,24,.9); color: #eef3fb; padding: 8px 14px;
@@ -412,11 +412,13 @@
       }
     }
     resize();
-    canvas.addEventListener("mousedown", (e) => {
+    canvas.addEventListener("pointerdown", (e) => {
+      e.preventDefault();
+      try { canvas.setPointerCapture(e.pointerId); } catch (_) {}
       const p = css(e);
       drag = { x0: p.x, y0: p.y, x1: p.x, y1: p.y };
     }, { signal: sig });
-    window.addEventListener("mousemove", (e) => {
+    window.addEventListener("pointermove", (e) => {
       const p = css(e);
       hover = p;
       if (drag) {
@@ -425,14 +427,16 @@
       }
       paint();
     }, { signal: sig });
-    window.addEventListener("mouseup", () => {
+    const endLive = () => {
       if (!drag) return;
       rect = norm(drag.x0, drag.y0, drag.x1, drag.y1);
       drag = null;
       if (rect.w > 8 && rect.h > 8) {
         onDone({ x: rect.x / dpr, y: rect.y / dpr, w: rect.w / dpr, h: rect.h / dpr });
       }
-    }, { signal: sig });
+    };
+    window.addEventListener("pointerup", endLive, { signal: sig });
+    window.addEventListener("pointercancel", endLive, { signal: sig });
     void hover;
   }
 
@@ -451,7 +455,9 @@
     canvas.className = "hud";
     const hint = document.createElement("div");
     hint.className = "hint";
-    hint.textContent = t("overlayHint", "Перетащите область · Shift — квадрат · Enter — весь экран · колесо — лупа");
+    hint.textContent = /Android/i.test(navigator.userAgent)
+      ? "Проведите пальцем, чтобы выделить область"
+      : t("overlayHint", "Перетащите область · Shift — квадрат · Enter — весь экран · колесо — лупа");
     const bar = document.createElement("div");
     bar.className = "bar";
     SS.shadow.append(img, canvas, hint, bar);
@@ -530,13 +536,15 @@
     freeze.onload = paint;
     resize();
 
-    canvas.addEventListener("mousedown", (e) => {
-      if (e.button !== 0) return;
+    canvas.addEventListener("pointerdown", (e) => {
+      if (e.pointerType === "mouse" && e.button !== 0) return;
+      e.preventDefault();
+      try { canvas.setPointerCapture(e.pointerId); } catch (_) {}
       const p = cssToCanvas(e);
       drag = { x0: p.x, y0: p.y, x1: p.x, y1: p.y };
       bar.style.display = "none";
     }, { signal: sig });
-    window.addEventListener("mousemove", (e) => {
+    window.addEventListener("pointermove", (e) => {
       const p = cssToCanvas(e);
       hover = p;
       if (drag) {
@@ -550,7 +558,7 @@
       }
       paint();
     }, { signal: sig });
-    window.addEventListener("mouseup", () => {
+    const endDrag = () => {
       if (!drag) return;
       const n = norm(drag.x0, drag.y0, drag.x1, drag.y1);
       drag = null;
@@ -559,7 +567,9 @@
       paint();
       placeBar(bar, n, dpr);
       fillBar(bar, rects, forceMulti);
-    }, { signal: sig });
+    };
+    window.addEventListener("pointerup", endDrag, { signal: sig });
+    window.addEventListener("pointercancel", endDrag, { signal: sig });
 
     window.addEventListener("keydown", (e) => {
       if (e.key === "Enter") {

@@ -2,6 +2,7 @@
 <html lang="ru">
 <head>
   <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>СкринСтудия</title>
   <link rel="stylesheet" href="popup.css">
 </head>
@@ -13,19 +14,21 @@
       <span>Снимок, GIF и редактор</span>
     </div>
   </header>
+  <p class="mobile-lead" hidden>Нажмите — и сразу снимок. Редактор откроется вкладкой.</p>
   <div class="grid">
-    <button data-mode="region"><span class="ico">▭</span><span><b data-i="captureRegion">Область</b><small>Несколько кусков, копировать, пин</small></span><kbd>Alt+Shift+S</kbd></button>
-    <button data-mode="visible"><span class="ico">▣</span><span><b data-i="captureVisible">Видимая область</b><small>То, что на экране</small></span><kbd>Alt+Shift+V</kbd></button>
+    <button data-mode="region"><span class="ico">▭</span><span><b data-i="captureRegion">Область</b><small>Выделить кусок экрана</small></span><kbd>Alt+Shift+S</kbd></button>
+    <button data-mode="visible"><span class="ico">▣</span><span><b data-i="captureVisible">Экран</b><small>То, что видно сейчас</small></span><kbd>Alt+Shift+V</kbd></button>
     <button data-mode="full"><span class="ico">↕</span><span><b data-i="captureFull">Вся страница</b><small>Длинный скролл</small></span><kbd>Alt+Shift+F</kbd></button>
-    <button data-mode="element"><span class="ico">◉</span><span><b data-i="captureElement">Элемент</b><small>Shift — скролл внутри</small></span><kbd>Alt+Shift+E</kbd></button>
-    <button data-mode="scroll"><span class="ico">☰</span><span><b>Скролл колонки</b><small>Чат, сайдбар, лента</small></span></button>
-    <button data-mode="timer"><span class="ico">⏱</span><span><b>Таймер</b><small>3 / 5 / 10 сек, пауза</small></span></button>
-    <button data-mode="wait"><span class="ico">◎</span><span><b>Ждать изменение</b><small>Модалка, анимация</small></span></button>
-    <button data-mode="hideui"><span class="ico">⊘</span><span><b>Без UI сайта</b><small>Cookie, sticky, чат</small></span></button>
-    <button data-mode="gif"><span class="ico">🎞</span><span><b>GIF области</b><small>5–15 секунд</small></span></button>
-    <button data-mode="scroll-video"><span class="ico">▶</span><span><b>Видео скролла</b><small>Прокрутка страницы</small></span></button>
-    <button data-mode="video-frame"><span class="ico">🎬</span><span><b>Кадр из видео</b><small>Текущий кадр &lt;video&gt;</small></span></button>
-    <button data-mode="repeat"><span class="ico">↺</span><span><b>Повторить последний</b><small>Тот же режим</small></span><kbd>Alt+Shift+R</kbd></button>
+    <button data-mode="element"><span class="ico">◉</span><span><b data-i="captureElement">Элемент</b><small>Клик по блоку</small></span><kbd>Alt+Shift+E</kbd></button>
+    <button data-mode="timer"><span class="ico">⏱</span><span><b>Таймер</b><small>3 / 5 / 10 сек</small></span></button>
+    <button class="more-toggle" type="button" id="moreToggle" hidden>Ещё режимы</button>
+    <button data-mode="scroll" class="extra"><span class="ico">☰</span><span><b>Скролл колонки</b><small>Чат, сайдбар, лента</small></span></button>
+    <button data-mode="wait" class="extra"><span class="ico">◎</span><span><b>Ждать изменение</b><small>Модалка, анимация</small></span></button>
+    <button data-mode="hideui" class="extra"><span class="ico">⊘</span><span><b>Без UI сайта</b><small>Cookie, sticky, чат</small></span></button>
+    <button data-mode="gif" class="extra"><span class="ico">🎞</span><span><b>GIF области</b><small>5–15 секунд</small></span></button>
+    <button data-mode="scroll-video" class="extra"><span class="ico">▶</span><span><b>Видео скролла</b><small>Прокрутка страницы</small></span></button>
+    <button data-mode="video-frame" class="extra"><span class="ico">🎬</span><span><b>Кадр из видео</b><small>Текущий кадр видео</small></span></button>
+    <button data-mode="repeat" class="extra"><span class="ico">↺</span><span><b>Повторить последний</b><small>Тот же режим</small></span><kbd>Alt+Shift+R</kbd></button>
   </div>
   <footer>
     <button id="openEditor" class="link">Редактор</button>
@@ -33,6 +36,7 @@
     <button id="options" class="link">Настройки</button>
   </footer>
   <script src="../shared/i18n.js"></script>
+  <script src="../shared/platform.js"></script>
   <script src="popup.js"></script>
 </body>
 </html>

@@ -49,6 +49,12 @@ document.getElementById("save").addEventListener("click", async () => {
 
 async function pingOcr() {
   const el = document.getElementById("ocrStatus");
+  if (window.SSPlatform && (await SSPlatform.isMobile())) {
+    el.textContent = "Firefox для Android: native-host недоступен. about: и AMO снять нельзя — ограничение браузера.";
+    const pingBtn = document.getElementById("ocrPing");
+    if (pingBtn) pingBtn.hidden = true;
+    return;
+  }
   try {
     const res = await browser.runtime.sendMessage({ type: "SS_OCR_PING" });
     if (res && res.ok) el.textContent = "Windows OCR подключён.";

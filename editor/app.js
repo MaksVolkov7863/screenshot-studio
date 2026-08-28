@@ -1,4 +1,5 @@
 (() => {
+  if (window.SSPlatform) SSPlatform.applyClass();
   const E = window.SSEngine;
   const $ = (id) => document.getElementById(id);
 
@@ -271,6 +272,9 @@
     $("btnZoomFit").onclick = fit;
     $("btnCopy").onclick = () => copyOut();
     $("btnSave").onclick = () => saveOut();
+    if ($("btnProps") && $("rightPanel")) {
+      $("btnProps").onclick = () => $("rightPanel").classList.toggle("open");
+    }
     $("btnUp").onclick = () => shiftLayer(1);
     $("btnDown").onclick = () => shiftLayer(-1);
     $("btnDup").onclick = duplicate;
