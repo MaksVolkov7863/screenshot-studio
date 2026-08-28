@@ -88,6 +88,10 @@ browser.runtime.onMessage.addListener((msg, sender) => {
       return { ok: true };
     },
     SS_REGION_RESULT: () => finishRegion(tabId, msg),
+    SS_PICKER_RESULT: () => finishPicker(msg),
+    SS_PICKER_CANCEL: async () => {
+      if (msg.id) await SSIDB.del(msg.id).catch(() => {});
+    },
     SS_ELEMENT_RESULT: () => finishElement(tabId, msg.rect, msg.scrollInner, msg.pointer),
     SS_CANCEL: () => teardownOverlay(tabId),
     SS_ABORT: async () => { abortCapture = true; await teardownOverlay(tabId); },
@@ -222,11 +226,15 @@ async function startCapture(mode, tabId, opts = {}) {
   const settings = await loadSettings();
 
   if (restricted) {
+    const shot = await captureNativeWindow();
+    if (mode === "region" || mode === "custom" || mode === "multi" || mode === "element" || mode === "gif" || mode === "scroll") {
+      await openRegionPicker(shot, { mode: "region", title: tab.title, url: tab.url, urlPage: tab.url, multi: mode === "multi" });
+      return;
+    }
     notify(
       "Защищённая страница",
-      "Firefox не отдаёт вкладку — снимаю окно браузера. Обрежьте лишнее в редакторе."
+      "Firefox не отдаёт вкладку — снят кадр окна браузера."
     );
-    const shot = await captureNativeWindow();
     await deliver(shot, { mode: mode + "-native", title: tab.title, url: tab.url });
     return;
   }
@@ -303,9 +311,8 @@ async function startCapture(mode, tabId, opts = {}) {
       await injectOverlay(tabId);
       await sendToTab(tabId, { type: "SS_REGION", dataUrl: shot.dataUrl, viewport: shot.viewport, multi: mode === "multi" });
     } catch (e) {
-      notify("Снимаю окно", "На этой странице нет оверлея — откроется редактор, там можно обрезать.");
       const shot = await captureNativeWindow();
-      await deliver(shot, { mode: "region-native", title: tab.title, url: tab.url });
+      await openRegionPicker(shot, { mode: "region", title: tab.title, url: tab.url, multi: mode === "multi" });
     }
     return;
   }
@@ -956,12 +963,43 @@ async function setBusy(on, label) {
 }
 
 async function injectOverlay(tabId) {
-  const ok = await evalInTab(tabId, () => !!window.__SS_OVERLAY__);
-  if (ok) return;
+  try {
+    const ping = await sendToTab(tabId, { type: "SS_PING" });
+    if (ping && ping.ok) return;
+  } catch (_) {}
+  try {
+    await evalInTab(tabId, () => {
+      try { delete window.__SS_OVERLAY__; } catch (_) {}
+    });
+  } catch (_) {}
   await browser.scripting.executeScript({
     target: { tabId },
     files: ["shared/i18n.js", "capture/overlay.js"],
   });
+}
+
+async function openRegionPicker(shot, meta) {
+  const id = await storeShot(shot, { ...meta, pendingRegion: true });
+  const url = browser.runtime.getURL(`capture/picker.html?id=${encodeURIComponent(id)}`);
+  try {
+    await browser.windows.create({ url, type: "popup", state: "maximized" });
+  } catch (_) {
+    await browser.tabs.create({ url });
+  }
+}
+
+async function finishPicker(msg) {
+  const rec = await SSIDB.get(msg.id);
+  if (!rec || !rec.dataUrl) throw new Error("Снимок не найден");
+  const rects = (msg.rects || []).filter((r) => r && r.w > 2 && r.h > 2);
+  if (!rects.length) throw new Error("Область не выделена");
+  const crops = [];
+  for (const r of rects) {
+    crops.push(await cropPixels(rec.dataUrl, r));
+  }
+  const shot = crops.length === 1 ? crops[0] : await stackShots(crops);
+  await SSIDB.del(msg.id).catch(() => {});
+  await deliver(shot, { ...(rec.meta || {}), mode: "region", act: msg.act, pendingRegion: false });
 }
 
 async function teardownOverlay(tabId) {

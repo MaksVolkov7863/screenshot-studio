@@ -64,6 +64,7 @@
   browser.runtime.onMessage.addListener((msg) => {
     if (!msg || !msg.type) return;
     const map = {
+      SS_PING: () => {},
       SS_REGION: () => startRegion(msg.dataUrl, msg.viewport, msg.multi),
       SS_ELEMENT: () => startElement(),
       SS_COUNTDOWN: () => startTimer(msg.ms || 3000),
