@@ -47,9 +47,10 @@ $cb = [FxCap+EnumProc] {
     return $true
 }
 [void][FxCap]::EnumWindows($cb, [IntPtr]::Zero)
-$hwnd = [FxCap]::GetForegroundWindow()
-if ((Get-Class $hwnd) -ne "MozillaWindowClass" -or (Get-Area $hwnd) -lt 32000) {
-    $hwnd = $script:best
+$hwnd = $script:best
+if ($script:bestArea -lt (600 * 400)) {
+    $fg = [FxCap]::GetForegroundWindow()
+    if ((Get-Class $fg) -eq "MozillaWindowClass") { $hwnd = $fg }
 }
 if ($hwnd -eq [IntPtr]::Zero) { throw "Firefox window not found" }
 

@@ -144,7 +144,7 @@
       <h3 class="keep">Сравнение</h3>
       <div class="row"><button class="btn" id="btnCompare">Второй снимок из истории</button></div>
       <h3 class="keep">OCR / PDF / выгрузка</h3>
-      <div class="row"><button class="btn" id="btnOcr">Распознать текст (Windows OCR)</button></div>
+      <div class="row"><button class="btn" id="btnOcr">Распознать текст</button></div>
       <div class="row"><button class="btn" id="btnPdf">PDF</button>
         <button class="btn" id="btnPrint">Печать</button></div>
       <div class="row"><button class="btn" id="btnUpload">Загрузить ссылку</button></div>
@@ -366,25 +366,42 @@
   async function runOcr(App) {
     const src = canvasForOcr(App);
     if (!src) return;
-    App.toast("Windows OCR…");
     const dataUrl = shrinkForOcr(src);
+    App.toast("Распознаю текст…");
     try {
-      const res = await browser.runtime.sendMessage({ type: "SS_OCR", image: dataUrl });
-      if (res && res.error === "not_installed") {
-        App.toast("Один раз запустите native\\install-ocr-host.ps1 и перезапустите Firefox");
-        return;
-      }
-      const text = (res && res.text || "").trim();
-      if (!res || !res.ok || !text) throw new Error((res && (res.error || res.message)) || "Пусто");
+      const text = (await ocrTesseract(dataUrl, App)).trim();
+      if (!text) throw new Error("Ничего не распознано");
       await navigator.clipboard.writeText(text);
       const box = document.getElementById("ocrBox");
       box.style.display = "block";
       box.style.left = "24px";
       box.style.top = "24px";
       box.textContent = text;
-      App.toast("Windows OCR — текст скопирован");
+      App.toast("Текст скопирован");
     } catch (e) {
       App.toast("OCR: " + (e.message || e));
+    }
+  }
+
+  async function ocrTesseract(dataUrl, App) {
+    if (typeof Tesseract === "undefined") throw new Error("Tesseract не загрузился");
+    const worker = await Tesseract.createWorker("rus+eng", 1, {
+      workerPath: browser.runtime.getURL("vendor/tesseract/worker.min.js"),
+      corePath: browser.runtime.getURL("vendor/tesseract/tesseract-core.wasm.js"),
+      langPath: "https://tessdata.projectnaptha.com/4.0.0",
+      gzip: true,
+      workerBlobURL: true,
+      logger: (m) => {
+        if (!m || !m.status) return;
+        const pct = m.progress != null ? " " + Math.round(m.progress * 100) + "%" : "";
+        App.toast(m.status + pct);
+      },
+    });
+    try {
+      const out = await worker.recognize(dataUrl);
+      return (out && out.data && out.data.text) || "";
+    } finally {
+      await worker.terminate();
     }
   }
 

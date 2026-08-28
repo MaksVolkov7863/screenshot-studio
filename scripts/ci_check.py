@@ -54,7 +54,7 @@ def main() -> None:
             fail(f"missing {rel}")
 
     js_files = list(ROOT.rglob("*.js"))
-    skip = {".git", "dist", "__pycache__", "node_modules"}
+    skip = {".git", "dist", "__pycache__", "node_modules", "vendor"}
     js_files = [p for p in js_files if not any(part in skip for part in p.parts)]
     node = subprocess.run(["node", "-e", "process.exit(0)"], capture_output=True)
     if node.returncode != 0:

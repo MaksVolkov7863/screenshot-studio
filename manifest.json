@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "__MSG_extensionName__",
   "short_name": "__MSG_extensionShortName__",
-  "version": "2.1.1",
+  "version": "2.2.0",
   "description": "__MSG_extensionDescription__",
   "author": "Nikita",
   "default_locale": "ru",
@@ -87,7 +87,7 @@
     }
   },
   "content_security_policy": {
-    "extension_pages": "script-src 'self' 'wasm-unsafe-eval'; object-src 'self'; connect-src 'self' https: data: blob:; img-src 'self' data: blob: https:;"
+    "extension_pages": "script-src 'self' 'wasm-unsafe-eval'; object-src 'self'; worker-src 'self' blob:; connect-src 'self' https://tessdata.projectnaptha.com https://cdn.jsdelivr.net blob: data: https:; img-src 'self' data: blob: https:;"
   },
   "web_accessible_resources": [
     {

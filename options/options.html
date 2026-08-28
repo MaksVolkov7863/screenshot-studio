@@ -62,10 +62,11 @@
     <label>Webhook (Notion / Jira / свой)
       <input id="webhookUrl" type="url">
     </label>
-    <h2>Windows OCR</h2>
-    <p class="lead" id="ocrStatus">Проверяю native-host…</p>
-    <p class="lead">Один раз запустите <code>native\install-ocr-host.ps1</code> в папке расширения, затем перезапустите Firefox. Текст читает встроенный движок Windows 10/11, без интернета.</p>
-    <button type="button" id="ocrPing">Проверить Windows OCR</button>
+    <h2>OCR</h2>
+    <p class="lead">Текст распознаётся в редакторе движком Tesseract — ничего ставить на Windows не нужно. Первый запуск скачает языковые данные (рус/англ) в браузер.</p>
+    <p class="lead">Native-host нужен только для снимка <em>защищённых</em> страниц Firefox (about:, AMO, встроенный PDF), не для OCR.</p>
+    <p class="lead" id="ocrStatus"></p>
+    <button type="button" id="ocrPing">Проверить native-host (защищённые страницы)</button>
     <button id="save">Сохранить</button>
     <p id="ok" hidden>Сохранено</p>
   </main>

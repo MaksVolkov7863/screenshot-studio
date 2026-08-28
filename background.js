@@ -168,7 +168,7 @@ function isRestricted(url) {
 }
 
 async function captureNativeWindow() {
-  await sleep(250);
+  await sleep(450);
   try {
     const res = await browser.runtime.sendNativeMessage("screenshot_studio_ocr", { action: "capture" });
     if (!res || !res.ok || !res.dataUrl) {
@@ -214,11 +214,19 @@ async function startCapture(mode, tabId, opts = {}) {
   const settings = await loadSettings();
 
   if (restricted) {
-    notify(
-      "Защищённая страница",
-      "Firefox не даёт снимать вкладку — снимаю окно. Обрежьте лишнее в редакторе."
-    );
-    const shot = await captureNativeWindow();
+    let shot = null;
+    try {
+      shot = await captureVisible(tab);
+    } catch (_) {
+      shot = null;
+    }
+    if (!shot) {
+      notify(
+        "Защищённая страница",
+        "Firefox не отдаёт вкладку — снимаю окно браузера. Обрежьте лишнее в редакторе."
+      );
+      shot = await captureNativeWindow();
+    }
     await deliver(shot, { mode: mode + "-native", title: tab.title, url: tab.url });
     return;
   }

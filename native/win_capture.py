@@ -73,11 +73,11 @@ def pick_hwnd():
         user32.SetProcessDPIAware()
     except Exception:
         pass
-    fg = user32.GetForegroundWindow()
-    if fg and _class_name(fg) == "MozillaWindowClass" and _area(fg) > 200 * 160:
-        return fg
     wins = _enum_mozilla()
-    return wins[0][1] if wins else fg
+    big = [(a, h) for a, h in wins if a >= 600 * 400]
+    if big:
+        return big[0][1]
+    return wins[0][1] if wins else user32.GetForegroundWindow()
 
 
 def grab_hwnd(hwnd) -> bytes:

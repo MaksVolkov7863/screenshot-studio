@@ -2,10 +2,13 @@ document.querySelectorAll("[data-mode]").forEach((btn) => {
   btn.addEventListener("click", async () => {
     const mode = btn.getAttribute("data-mode");
     btn.disabled = true;
-    browser.runtime.sendMessage({ type: "SS_CAPTURE", mode }).catch((e) => {
-      console.warn(e);
-    });
-    window.close();
+    try {
+      await browser.runtime.sendMessage({ type: "SS_CAPTURE", mode });
+      window.close();
+    } catch (e) {
+      btn.disabled = false;
+      alert(e && e.message ? e.message : String(e));
+    }
   });
 });
 

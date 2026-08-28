@@ -1,0 +1,3 @@
+Tesseract.js 5.1.1 (Apache-2.0)
+https://github.com/naptha/tesseract.js
+Language data is fetched on first OCR from https://tessdata.projectnaptha.com
