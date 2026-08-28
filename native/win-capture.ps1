@@ -18,9 +18,10 @@ public class FxCap {
   [DllImport("user32.dll", CharSet=CharSet.Unicode)] public static extern int GetClassName(IntPtr hWnd, StringBuilder n, int max);
   [DllImport("user32.dll")] public static extern bool EnumWindows(EnumProc lpEnumFunc, IntPtr lParam);
   [DllImport("user32.dll")] public static extern bool GetWindowRect(IntPtr hWnd, out RECT r);
-  [DllImport("user32.dll")] public static extern bool LogicalToPhysicalPointForPerMonitorDPI(IntPtr hWnd, ref POINT p);
   [DllImport("user32.dll")] public static extern bool SetForegroundWindow(IntPtr hWnd);
   [DllImport("user32.dll")] public static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
+  [DllImport("user32.dll")] public static extern bool IsIconic(IntPtr hWnd);
+  [DllImport("user32.dll")] public static extern int GetWindowLong(IntPtr hWnd, int nIndex);
   public delegate bool EnumProc(IntPtr hWnd, IntPtr lParam);
   public struct RECT { public int Left, Top, Right, Bottom; }
   public struct POINT { public int X, Y; }
@@ -54,6 +55,8 @@ $script:bestArea = 0
 $cb = [FxCap+EnumProc] {
     param([IntPtr]$h, [IntPtr]$lp)
     if ([FxCap]::IsWindowVisible($h) -and (Get-Class $h) -eq "MozillaWindowClass") {
+        $style = [FxCap]::GetWindowLong($h, -16)
+        if (($style -band 0x80000000) -ne 0) { return $true }
         $a = Get-Area $h
         if ($a -gt $script:bestArea) { $script:bestArea = $a; $script:best = $h }
     }
@@ -67,22 +70,19 @@ if ($script:bestArea -lt (600 * 400)) {
 }
 if ($hwnd -eq [IntPtr]::Zero) { throw "Firefox window not found" }
 
-[void][FxCap]::ShowWindow($hwnd, 9)
+if ([FxCap]::IsIconic($hwnd)) {
+    [void][FxCap]::ShowWindow($hwnd, 9)
+    Start-Sleep -Milliseconds 200
+}
 [void][FxCap]::SetForegroundWindow($hwnd)
-Start-Sleep -Milliseconds 120
 
 $rc = New-Object FxCap+RECT
 [void][FxCap]::GetClientRect($hwnd, [ref]$rc)
 $pt = New-Object FxCap+POINT
 $pt.X = 0; $pt.Y = 0
 [void][FxCap]::ClientToScreen($hwnd, [ref]$pt)
-try { [void][FxCap]::LogicalToPhysicalPointForPerMonitorDPI($hwnd, [ref]$pt) } catch {}
-$br = New-Object FxCap+POINT
-$br.X = $rc.Right; $br.Y = $rc.Bottom
-[void][FxCap]::ClientToScreen($hwnd, [ref]$br)
-try { [void][FxCap]::LogicalToPhysicalPointForPerMonitorDPI($hwnd, [ref]$br) } catch {}
-$w = $br.X - $pt.X
-$h = $br.Y - $pt.Y
+$w = $rc.Right - $rc.Left
+$h = $rc.Bottom - $rc.Top
 if ($w -lt 8 -or $h -lt 8) { throw "window too small" }
 
 $bmp = New-Object System.Drawing.Bitmap $w, $h

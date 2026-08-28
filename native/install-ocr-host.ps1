@@ -1,4 +1,5 @@
-# Registers Windows OCR native host for Firefox (Screenshot Studio).
+# Registers native host for Firefox (Screenshot Studio).
+# Firefox on Windows finds hosts via the registry, not only the JSON file.
 $ErrorActionPreference = "Stop"
 $here = Split-Path -Parent $MyInvocation.MyCommand.Path
 $cmd = Join-Path $here "ocr-host.cmd"
@@ -10,7 +11,7 @@ $cmdEsc = $cmd.Replace("\", "\\")
 $json = @"
 {
   "name": "screenshot_studio_ocr",
-  "description": "Windows OCR for Screenshot Studio",
+  "description": "Windows capture host for Screenshot Studio",
   "path": "$cmdEsc",
   "type": "stdio",
   "allowed_extensions": ["screenshot-studio@nikita.dev"]
@@ -18,6 +19,12 @@ $json = @"
 "@
 $out = Join-Path $destDir "screenshot_studio_ocr.json"
 [System.IO.File]::WriteAllText($out, $json)
+
+$regPath = "HKCU:\Software\Mozilla\NativeMessagingHosts\screenshot_studio_ocr"
+New-Item -Path $regPath -Force | Out-Null
+Set-ItemProperty -Path $regPath -Name "(default)" -Value $out
+
 Write-Host "OK: $out"
+Write-Host "Registry: $regPath -> $out"
 Write-Host "Host: $cmd"
-Write-Host "Restart Firefox, then use Recognize text in the editor."
+Write-Host "Fully quit Firefox (all windows) and open it again."

@@ -52,7 +52,7 @@ async function pingOcr() {
   try {
     const res = await browser.runtime.sendMessage({ type: "SS_OCR_PING" });
     if (res && res.ok) el.textContent = "Windows OCR подключён.";
-    else el.textContent = "Host не установлен. Запустите native\\install-ocr-host.ps1 и перезапустите Firefox.";
+    else el.textContent = "Host не установлен. Запустите native\\install-ocr-host.ps1 (нужен ключ в реестре Firefox) и полностью закройте Firefox.";
   } catch (e) {
     el.textContent = "Host не установлен: " + (e.message || e);
   }

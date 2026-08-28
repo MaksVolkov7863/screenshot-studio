@@ -81,9 +81,10 @@ browser.runtime.onMessage.addListener((msg, sender) => {
   const tabId = sender.tab && sender.tab.id;
   const handlers = {
     SS_CAPTURE: async () => {
-      const tab = await getActiveTab();
-      if (!tab) throw new Error("Нет активной вкладки");
-      await startCapture(msg.mode, tab.id, msg.opts || {});
+      const tabId = msg.tabId != null ? msg.tabId : (await getActiveTab() || {}).id;
+      if (tabId == null) throw new Error("Нет активной вкладки");
+      await sleep(350);
+      await startCapture(msg.mode, tabId, msg.opts || {});
       return { ok: true };
     },
     SS_REGION_RESULT: () => finishRegion(tabId, msg),
@@ -147,8 +148,15 @@ async function loadSettings() {
 }
 
 async function getActiveTab() {
-  const tabs = await browser.tabs.query({ active: true, currentWindow: true });
-  return tabs[0] || null;
+  const last = await browser.tabs.query({ active: true, lastFocusedWindow: true });
+  if (last[0] && last[0].id != null && !String(last[0].url || "").startsWith("moz-extension:")) return last[0];
+  const wins = await browser.windows.getAll({ populate: true, windowTypes: ["normal"] });
+  for (const w of wins) {
+    const t = (w.tabs || []).find((x) => x.active);
+    if (t && t.id != null) return t;
+  }
+  const any = await browser.tabs.query({ active: true, currentWindow: true });
+  return any[0] || null;
 }
 
 function isRestricted(url) {
@@ -168,7 +176,7 @@ function isRestricted(url) {
 }
 
 async function captureNativeWindow() {
-  await sleep(500);
+  await sleep(80);
   try {
     const res = await browser.runtime.sendNativeMessage("screenshot_studio_ocr", { action: "capture" });
     if (!res || !res.ok || !res.dataUrl) {
@@ -214,19 +222,11 @@ async function startCapture(mode, tabId, opts = {}) {
   const settings = await loadSettings();
 
   if (restricted) {
-    let shot = null;
-    try {
-      shot = await captureVisible(tab);
-    } catch (_) {
-      shot = null;
-    }
-    if (!shot) {
-      notify(
-        "Защищённая страница",
-        "Firefox не отдаёт вкладку — снимаю окно браузера. Обрежьте лишнее в редакторе."
-      );
-      shot = await captureNativeWindow();
-    }
+    notify(
+      "Защищённая страница",
+      "Firefox не отдаёт вкладку — снимаю окно браузера. Обрежьте лишнее в редакторе."
+    );
+    const shot = await captureNativeWindow();
     await deliver(shot, { mode: mode + "-native", title: tab.title, url: tab.url });
     return;
   }

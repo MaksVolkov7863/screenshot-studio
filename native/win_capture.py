@@ -1,8 +1,7 @@
-"""Capture the Firefox window from actual screen pixels.
+"""Capture the Firefox window from actual screen pixels at physical DPI.
 
-PrintWindow(PW_RENDERFULLCONTENT) on GPU-composited Firefox often returns a
-downscaled compositor cache. That is the blurry/pixelated image on about:,
-AMO and PDF. BitBlt from the desktop DC matches what is on screen at physical DPI.
+Do not PrintWindow GPU-composited Firefox (downscaled compositor cache).
+Do not SW_RESTORE a maximized window (that shrinks it to a tiny restored size).
 """
 from __future__ import annotations
 
@@ -10,17 +9,14 @@ import ctypes
 import struct
 import time
 import zlib
-from ctypes import wintypes
 
-# DPI awareness MUST be set before any other user32 geometry call.
+# DPI must be set before wintypes/user32 geometry calls.
 def _bootstrap_dpi() -> None:
     try:
-        user32_early = ctypes.WinDLL("user32", use_last_error=True)
-        fn = getattr(user32_early, "SetProcessDpiAwarenessContext", None)
-        if fn:
-            # -4 = PER_MONITOR_AWARE_V2, -3 = PER_MONITOR_AWARE
-            if fn(ctypes.c_void_p(-4)) or fn(ctypes.c_void_p(-3)):
-                return
+        u = ctypes.WinDLL("user32", use_last_error=True)
+        fn = getattr(u, "SetProcessDpiAwarenessContext", None)
+        if fn and (fn(ctypes.c_void_p(-4)) or fn(ctypes.c_void_p(-3))):
+            return
     except Exception:
         pass
     try:
@@ -36,6 +32,8 @@ def _bootstrap_dpi() -> None:
 
 _bootstrap_dpi()
 
+from ctypes import wintypes  # noqa: E402
+
 user32 = ctypes.windll.user32
 gdi32 = ctypes.windll.gdi32
 dwmapi = ctypes.windll.dwmapi
@@ -46,30 +44,22 @@ user32.GetClientRect.argtypes = [wintypes.HWND, ctypes.POINTER(wintypes.RECT)]
 user32.ClientToScreen.argtypes = [wintypes.HWND, ctypes.POINTER(wintypes.POINT)]
 user32.IsWindowVisible.argtypes = [wintypes.HWND]
 user32.GetClassNameW.argtypes = [wintypes.HWND, wintypes.LPWSTR, ctypes.c_int]
+user32.GetWindowTextW.argtypes = [wintypes.HWND, wintypes.LPWSTR, ctypes.c_int]
+user32.GetWindowLongW.argtypes = [wintypes.HWND, ctypes.c_int]
+user32.IsIconic.argtypes = [wintypes.HWND]
+user32.IsZoomed.argtypes = [wintypes.HWND]
 user32.ShowWindow.argtypes = [wintypes.HWND, ctypes.c_int]
 user32.SetForegroundWindow.argtypes = [wintypes.HWND]
 user32.GetDC.restype = wintypes.HDC
 user32.ReleaseDC.argtypes = [wintypes.HWND, wintypes.HDC]
-gdi32.CreateCompatibleDC.argtypes = [wintypes.HDC]
-gdi32.CreateCompatibleBitmap.argtypes = [wintypes.HDC, ctypes.c_int, ctypes.c_int]
-gdi32.BitBlt.argtypes = [
-    wintypes.HDC,
-    ctypes.c_int,
-    ctypes.c_int,
-    ctypes.c_int,
-    ctypes.c_int,
-    wintypes.HDC,
-    ctypes.c_int,
-    ctypes.c_int,
-    wintypes.DWORD,
-]
-gdi32.SelectObject.argtypes = [wintypes.HDC, wintypes.HGDIOBJ]
-gdi32.DeleteObject.argtypes = [wintypes.HGDIOBJ]
-gdi32.DeleteDC.argtypes = [wintypes.HDC]
 
+GWL_STYLE = -16
+GWL_EXSTYLE = -20
+WS_POPUP = 0x80000000
+WS_EX_TOOLWINDOW = 0x00000080
+SW_RESTORE = 9
 SRCCOPY = 0x00CC0020
 CAPTUREBLT = 0x40000000
-SW_RESTORE = 9
 DWMWA_EXTENDED_FRAME_BOUNDS = 9
 
 
@@ -102,19 +92,48 @@ def _class_name(hwnd) -> str:
     return buf.value
 
 
-def _area(hwnd) -> int:
+def _title(hwnd) -> str:
+    buf = ctypes.create_unicode_buffer(512)
+    user32.GetWindowTextW(hwnd, buf, 512)
+    return buf.value
+
+
+def _style(hwnd) -> int:
+    return user32.GetWindowLongW(hwnd, GWL_STYLE) & 0xFFFFFFFF
+
+
+def _exstyle(hwnd) -> int:
+    return user32.GetWindowLongW(hwnd, GWL_EXSTYLE) & 0xFFFFFFFF
+
+
+def _is_browser_frame(hwnd) -> bool:
+    if not user32.IsWindowVisible(hwnd):
+        return False
+    if _class_name(hwnd) != "MozillaWindowClass":
+        return False
+    if _style(hwnd) & WS_POPUP:
+        return False
+    if _exstyle(hwnd) & WS_EX_TOOLWINDOW:
+        return False
+    if not _title(hwnd).strip():
+        return False
+    return True
+
+
+def _win_size(hwnd):
     r = wintypes.RECT()
     if not user32.GetWindowRect(hwnd, ctypes.byref(r)):
-        return 0
-    return max(0, r.right - r.left) * max(0, r.bottom - r.top)
+        return 0, 0
+    return max(0, r.right - r.left), max(0, r.bottom - r.top)
 
 
 def _enum_mozilla():
     found = []
 
     def cb(hwnd, _lparam):
-        if user32.IsWindowVisible(hwnd) and _class_name(hwnd) == "MozillaWindowClass":
-            found.append((_area(hwnd), hwnd))
+        if _is_browser_frame(hwnd):
+            w, h = _win_size(hwnd)
+            found.append((w * h, w, h, hwnd))
         return True
 
     user32.EnumWindows(WNDENUMPROC(cb), 0)
@@ -124,39 +143,28 @@ def _enum_mozilla():
 
 def pick_hwnd():
     wins = _enum_mozilla()
-    big = [(a, h) for a, h in wins if a >= 600 * 400]
+    big = [x for x in wins if x[1] >= 500 and x[2] >= 300]
     if big:
-        return big[0][1]
-    return wins[0][1] if wins else user32.GetForegroundWindow()
-
-
-def _phys_point(hwnd, pt: wintypes.POINT) -> wintypes.POINT:
-    try:
-        user32.LogicalToPhysicalPointForPerMonitorDPI(hwnd, ctypes.byref(pt))
-    except Exception:
-        pass
-    return pt
+        return big[0][3]
+    return wins[0][3] if wins else user32.GetForegroundWindow()
 
 
 def _client_box(hwnd):
-    """Client area in physical screen pixels."""
+    """Client area in physical screen pixels (process is per-monitor DPI v2)."""
     origin = wintypes.POINT(0, 0)
     user32.ClientToScreen(hwnd, ctypes.byref(origin))
     client = wintypes.RECT()
     user32.GetClientRect(hwnd, ctypes.byref(client))
-    br = wintypes.POINT(client.right, client.bottom)
-    user32.ClientToScreen(hwnd, ctypes.byref(br))
-    _phys_point(hwnd, origin)
-    _phys_point(hwnd, br)
-    width = br.x - origin.x
-    height = br.y - origin.y
+    width, height = client.right - client.left, client.bottom - client.top
     if width >= 8 and height >= 8:
         return origin.x, origin.y, width, height
-
     ext = wintypes.RECT()
-    if dwmapi.DwmGetWindowAttribute(
-        hwnd, DWMWA_EXTENDED_FRAME_BOUNDS, ctypes.byref(ext), ctypes.sizeof(ext)
-    ) == 0:
+    if (
+        dwmapi.DwmGetWindowAttribute(
+            hwnd, DWMWA_EXTENDED_FRAME_BOUNDS, ctypes.byref(ext), ctypes.sizeof(ext)
+        )
+        == 0
+    ):
         return ext.left, ext.top, max(1, ext.right - ext.left), max(1, ext.bottom - ext.top)
     wnd = wintypes.RECT()
     user32.GetWindowRect(hwnd, ctypes.byref(wnd))
@@ -186,18 +194,6 @@ def _read_dib(hdc, hbmp, width, height) -> bytearray:
     return _bgra_to_rgba(bytes(raw), width * height)
 
 
-def _is_mostly_black(rgba: bytearray, width: int, height: int) -> bool:
-    step = max(1, (width * height) // 4000)
-    dark = 0
-    n = 0
-    for i in range(0, width * height, step):
-        o = i * 4
-        n += 1
-        if rgba[o] < 8 and rgba[o + 1] < 8 and rgba[o + 2] < 8:
-            dark += 1
-    return n > 0 and dark / n > 0.97
-
-
 def _bitblt_screen(x: int, y: int, width: int, height: int) -> bytearray:
     hdc_screen = user32.GetDC(0)
     if not hdc_screen:
@@ -224,46 +220,19 @@ def _bitblt_screen(x: int, y: int, width: int, height: int) -> bytearray:
         user32.ReleaseDC(0, hdc_screen)
 
 
-def _print_window(hwnd, width: int, height: int) -> bytearray:
-    hdc_win = user32.GetDC(hwnd)
-    hdc_mem = gdi32.CreateCompatibleDC(hdc_win)
-    hbmp = gdi32.CreateCompatibleBitmap(hdc_win, width, height)
-    old = gdi32.SelectObject(hdc_mem, hbmp)
-    try:
-        if not user32.PrintWindow(hwnd, hdc_mem, 2):
-            if not user32.PrintWindow(hwnd, hdc_mem, 0):
-                raise RuntimeError("PrintWindow failed")
-        gdi32.SelectObject(hdc_mem, old)
-        old = None
-        return _read_dib(hdc_win, hbmp, width, height)
-    finally:
-        if old is not None:
-            gdi32.SelectObject(hdc_mem, old)
-        gdi32.DeleteObject(hbmp)
-        gdi32.DeleteDC(hdc_mem)
-        user32.ReleaseDC(hwnd, hdc_win)
-
-
 def grab_hwnd(hwnd) -> bytes:
-    try:
+    if user32.IsIconic(hwnd):
         user32.ShowWindow(hwnd, SW_RESTORE)
+        time.sleep(0.2)
+    try:
         user32.SetForegroundWindow(hwnd)
-        time.sleep(0.12)
     except Exception:
         pass
 
     x, y, width, height = _client_box(hwnd)
     if width < 8 or height < 8:
         raise RuntimeError("window too small")
-
     rgba = _bitblt_screen(x, y, width, height)
-    if _is_mostly_black(rgba, width, height):
-        try:
-            alt = _print_window(hwnd, width, height)
-            if not _is_mostly_black(alt, width, height):
-                rgba = alt
-        except Exception:
-            pass
     return _png(width, height, rgba)
 
 

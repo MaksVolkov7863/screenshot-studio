@@ -3,14 +3,24 @@ document.querySelectorAll("[data-mode]").forEach((btn) => {
     const mode = btn.getAttribute("data-mode");
     btn.disabled = true;
     try {
-      await browser.runtime.sendMessage({ type: "SS_CAPTURE", mode });
-      window.close();
+      const tabs = await browser.tabs.query({ active: true, lastFocusedWindow: true });
+      const tabId = tabs[0] && tabs[0].id;
+      browser.runtime.sendMessage({ type: "SS_CAPTURE", mode, tabId }).catch((e) => {
+        notifyFail(e);
+      });
     } catch (e) {
-      btn.disabled = false;
-      alert(e && e.message ? e.message : String(e));
+      notifyFail(e);
+      return;
     }
+    window.close();
   });
 });
+
+function notifyFail(e) {
+  try {
+    alert(e && e.message ? e.message : String(e));
+  } catch (_) {}
+}
 
 document.getElementById("openEditor").addEventListener("click", async () => {
   const { lastCaptureId } = await browser.storage.local.get("lastCaptureId");

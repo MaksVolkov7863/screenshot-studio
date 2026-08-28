@@ -52,4 +52,4 @@ python scripts/pack.py
 
 **OCR** работает в редакторе через Tesseract, без установки на Windows. Первый раз скачаются языковые файлы (рус/англ) в браузер.
 
-**Защищённые страницы** (`about:`, AMO, PDF): Firefox не отдаёт вкладку расширению, поэтому native-host снимает **пиксели экрана** клиентской области окна (не PrintWindow — у GPU-Firefox он даёт мыльную миниатюру). Нужен `native\install-ocr-host.ps1` и перезапуск Firefox. Обрежьте хром браузера в редакторе.
+**Защищённые страницы** (`about:`, AMO, PDF): Firefox не отдаёт вкладку расширению. Снимаются пиксели экрана окна (после закрытия попапа, без сворачивания развёрнутого окна). Один раз запустите `native\install-ocr-host.ps1` (пишет JSON **и** ключ реестра `HKCU\Software\Mozilla\NativeMessagingHosts\screenshot_studio_ocr`), затем полностью закройте Firefox.
