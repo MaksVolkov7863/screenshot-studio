@@ -60,6 +60,14 @@ footer {
   padding: 4px 0;
 }
 .link:hover { text-decoration: underline; }
+.err {
+  margin: 0 12px 8px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: rgba(255, 77, 109, 0.16);
+  color: #ff8da3;
+  font-size: 12px;
+}
 .mobile-lead { display: none; margin: 0; padding: 0 14px 8px; color: var(--muted); font-size: 12px; }
 .more-toggle {
   display: none;

@@ -105,11 +105,19 @@ browser.runtime.onMessage.addListener((msg, sender) => {
   const tabId = sender.tab && sender.tab.id;
   const handlers = {
     SS_CAPTURE: async () => {
-      const tabId = msg.tabId != null ? msg.tabId : (await getActiveTab() || {}).id;
-      if (tabId == null) throw new Error("Нет активной вкладки");
-      await sleep(350);
-      await startCapture(msg.mode, tabId, msg.opts || {});
-      return { ok: true };
+      let tabId = msg.tabId;
+      if (tabId == null) {
+        const tab = await getActiveTab();
+        tabId = tab && tab.id;
+      }
+      if (tabId == null) throw new Error("Нет активной вкладки. Откройте сайт и нажмите снова.");
+      await setBusy(true, "…");
+      try {
+        await startCapture(msg.mode, tabId, msg.opts || {});
+        return { ok: true };
+      } finally {
+        await setBusy(false);
+      }
     },
     SS_REGION_RESULT: () => finishRegion(tabId, msg),
     SS_PICKER_RESULT: () => finishPicker(msg),
@@ -175,16 +183,34 @@ async function loadSettings() {
   return { ...DEFAULTS, ...(cur.settings || {}) };
 }
 
+function isPageTab(t) {
+  if (!t || t.id == null) return false;
+  const url = String(t.url || "");
+  if (url.startsWith("moz-extension:")) return false;
+  return true;
+}
+
 async function getActiveTab() {
-  const last = await browser.tabs.query({ active: true, lastFocusedWindow: true });
-  if (last[0] && last[0].id != null && !String(last[0].url || "").startsWith("moz-extension:")) return last[0];
-  const wins = await browser.windows.getAll({ populate: true, windowTypes: ["normal"] });
-  for (const w of wins) {
-    const t = (w.tabs || []).find((x) => x.active);
-    if (t && t.id != null) return t;
+  const queries = [
+    { active: true, currentWindow: true },
+    { active: true, lastFocusedWindow: true },
+    { active: true },
+  ];
+  for (const q of queries) {
+    try {
+      const tabs = await browser.tabs.query(q);
+      const page = tabs.find(isPageTab);
+      if (page) return page;
+    } catch (_) {}
   }
-  const any = await browser.tabs.query({ active: true, currentWindow: true });
-  return any[0] || null;
+  try {
+    const wins = await browser.windows.getAll({ populate: true, windowTypes: ["normal"] });
+    for (const w of wins) {
+      const t = (w.tabs || []).find((x) => x.active && isPageTab(x));
+      if (t) return t;
+    }
+  } catch (_) {}
+  return null;
 }
 
 function isRestricted(url) {
@@ -238,7 +264,11 @@ async function captureVisibleOrNative(tab) {
   try {
     return await captureVisible(tab);
   } catch (e) {
-    return await captureNativeWindow();
+    try {
+      return await captureNativeWindow();
+    } catch (_) {
+      throw e;
+    }
   }
 }
 
@@ -255,7 +285,7 @@ async function startCapture(mode, tabId, opts = {}) {
   const settings = await loadSettings();
 
   if (restricted) {
-    const shot = await captureNativeWindow();
+    const shot = await captureVisibleOrNative(tab);
     if (mode === "region" || mode === "custom" || mode === "multi" || mode === "element" || mode === "gif" || mode === "scroll") {
       await openRegionPicker(shot, { mode: "region", title: tab.title, url: tab.url, urlPage: tab.url, multi: mode === "multi" });
       return;
@@ -274,7 +304,7 @@ async function startCapture(mode, tabId, opts = {}) {
       await send();
     } catch (e) {
       notify("Снимаю окно", "На этой странице нельзя внедрить оверлей.");
-      const shot = await captureNativeWindow();
+      const shot = await captureVisibleOrNative(tab);
       await deliver(shot, { mode: mode + "-native", title: tab.title, url: tab.url });
     }
   };
@@ -340,7 +370,7 @@ async function startCapture(mode, tabId, opts = {}) {
       await injectOverlay(tabId);
       await sendToTab(tabId, { type: "SS_REGION", dataUrl: shot.dataUrl, viewport: shot.viewport, multi: mode === "multi" });
     } catch (e) {
-      const shot = await captureNativeWindow();
+      const shot = await captureVisibleOrNative(tab);
       await openRegionPicker(shot, { mode: "region", title: tab.title, url: tab.url, multi: mode === "multi" });
     }
     return;
