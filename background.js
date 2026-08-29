@@ -408,11 +408,12 @@ async function finishRegion(tabId, msg) {
       return;
     }
 
-    const crops = [];
-    for (const r of rects) {
-      crops.push(await cropDataUrl(msg.dataUrl, r, msg.viewport));
+    let shot;
+    if (rects.length === 1) {
+      shot = await cropDataUrl(msg.dataUrl, rects[0], msg.viewport);
+    } else {
+      shot = await composeRects(msg.dataUrl, rects, msg.viewport);
     }
-    let shot = crops.length === 1 ? crops[0] : await stackShots(crops);
     shot.viewport = msg.viewport;
 
     await teardownOverlay(tabId);
@@ -937,6 +938,32 @@ function drawClick(ctx, x, y) {
   ctx.restore();
 }
 
+async function composeRects(dataUrl, rects, viewport) {
+  const img = await loadImage(dataUrl);
+  const sx = viewport && viewport.w ? img.width / viewport.w : 1;
+  const sy = viewport && viewport.h ? img.height / viewport.h : 1;
+  const boxes = rects.map((r) => ({
+    x: Math.round(r.x * sx),
+    y: Math.round(r.y * sy),
+    w: Math.max(1, Math.round(r.w * sx)),
+    h: Math.max(1, Math.round(r.h * sy)),
+  }));
+  const minX = Math.min(...boxes.map((b) => b.x));
+  const minY = Math.min(...boxes.map((b) => b.y));
+  const maxX = Math.max(...boxes.map((b) => b.x + b.w));
+  const maxY = Math.max(...boxes.map((b) => b.y + b.h));
+  const width = Math.max(1, maxX - minX);
+  const height = Math.max(1, maxY - minY);
+  const c = makeCanvas(width, height);
+  const ctx = c.getContext("2d");
+  ctx.fillStyle = "#0c1016";
+  ctx.fillRect(0, 0, width, height);
+  for (const b of boxes) {
+    ctx.drawImage(img, b.x, b.y, b.w, b.h, b.x - minX, b.y - minY, b.w, b.h);
+  }
+  return { dataUrl: await canvasPng(c), width, height };
+}
+
 async function stackShots(shots, gap) {
   gap = gap == null ? 16 : gap;
   const w = Math.max(...shots.map((s) => s.width));
@@ -1061,11 +1088,10 @@ async function finishPicker(msg) {
   if (!rec || !rec.dataUrl) throw new Error("Снимок не найден");
   const rects = (msg.rects || []).filter((r) => r && r.w > 2 && r.h > 2);
   if (!rects.length) throw new Error("Область не выделена");
-  const crops = [];
-  for (const r of rects) {
-    crops.push(await cropPixels(rec.dataUrl, r));
-  }
-  const shot = crops.length === 1 ? crops[0] : await stackShots(crops);
+  const shot =
+    rects.length === 1
+      ? await cropPixels(rec.dataUrl, rects[0])
+      : await composeRects(rec.dataUrl, rects);
   await SSIDB.del(msg.id).catch(() => {});
   await deliver(shot, { ...(rec.meta || {}), mode: "region", act: msg.act, pendingRegion: false });
 }
