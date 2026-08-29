@@ -446,7 +446,6 @@
     SS.mode = "region";
     const sig = signal();
     window.addEventListener("keydown", onEsc, { capture: true, signal: sig });
-    trackPointer(sig);
 
     const img = new Image();
     img.className = "freeze";

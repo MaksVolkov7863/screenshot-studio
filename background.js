@@ -10,8 +10,8 @@ const DEFAULTS = {
   delayMs: 3000,
   filenamePattern: "{site}-{title}-{date}-{time}",
   autoFolder: true,
-  includeCursor: true,
-  includeClicks: true,
+  includeCursor: false,
+  includeClicks: false,
   scaleExport: "screen",
   imgbbKey: "",
   uploadUrl: "",
@@ -180,7 +180,13 @@ browser.runtime.onMessage.addListener((msg, sender) => {
 
 async function ensureDefaults() {
   const cur = await browser.storage.local.get("settings");
-  await browser.storage.local.set({ settings: { ...DEFAULTS, ...(cur.settings || {}) } });
+  const next = { ...DEFAULTS, ...(cur.settings || {}) };
+  if (next.stampPointerMigrated !== 1) {
+    next.includeCursor = false;
+    next.includeClicks = false;
+    next.stampPointerMigrated = 1;
+  }
+  await browser.storage.local.set({ settings: next });
 }
 
 async function loadSettings() {
@@ -388,7 +394,6 @@ async function startCapture(mode, tabId, opts = {}) {
 async function finishRegion(tabId, msg) {
   try {
     const tab = tabId != null ? await browser.tabs.get(tabId) : null;
-    const settings = await loadSettings();
     const act = msg.act;
     const rects = msg.rects && msg.rects.length ? msg.rects : [msg.rect];
 
@@ -409,7 +414,6 @@ async function finishRegion(tabId, msg) {
     }
     let shot = crops.length === 1 ? crops[0] : await stackShots(crops);
     shot.viewport = msg.viewport;
-    shot = await stampPointer(shot, msg.pointer, settings, true);
 
     await teardownOverlay(tabId);
     const meta = { mode: "region", title: tab ? tab.title : "", url: tab ? tab.url : "", act };
