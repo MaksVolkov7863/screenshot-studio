@@ -57,6 +57,13 @@
       position: fixed; pointer-events: none; background: #ff6a3d; color: #1a0c07;
       font-size: 11px; font-weight: 700; padding: 3px 8px; border-radius: 6px;
     }
+    .pick-box {
+      position: fixed; pointer-events: none; z-index: 5;
+      border: 2px solid #ff6a3d; border-radius: 4px;
+      box-shadow: 0 0 0 200vmax rgba(6,8,14,0.28);
+      display: none;
+    }
+    .dock button:disabled { opacity: 0.4; cursor: default; }
     .live-pass { pointer-events: none !important; }
     .live-pass .dock, .live-pass .count-wrap, .live-pass .hint { pointer-events: auto !important; }
   `;
@@ -276,60 +283,174 @@
     ensureHost(false);
     SS.mode = "hide";
     const sig = signal();
-    window.addEventListener("keydown", (e) => {
-      if (e.key === "Enter") {
-        e.preventDefault();
-        finishHide();
-      }
-      onEsc(e);
-    }, { capture: true, signal: sig });
     const hint = document.createElement("div");
     hint.className = "hint";
     hint.style.pointerEvents = "auto";
-    hint.textContent = t("hideHint", "Клик — скрыть элемент.");
     const dock = document.createElement("div");
     dock.className = "dock";
     dock.style.display = "flex";
     dock.innerHTML = `
-      <button data-act="sticky">Sticky</button>
-      <button data-act="cookie">Cookie</button>
-      <button data-act="chat">Чат</button>
+      <button data-act="undo" disabled>Шаг назад</button>
+      <button data-act="wider">Шире</button>
+      <button data-act="narrower">Точнее</button>
+      <button data-act="sticky">Все sticky</button>
+      <button data-act="cookie">Все cookie</button>
+      <button data-act="chat">Все чаты</button>
       <button class="primary" data-act="shot">${t("captureNow", "Снять")}</button>
       <button data-act="cancel">${t("cancel", "Отмена")}</button>`;
     const canvas = document.createElement("canvas");
     canvas.className = "hud";
     canvas.style.cursor = "pointer";
-    SS.shadow.append(canvas, hint, dock);
-    const hidden = [];
-    const hideEl = (el) => {
-      if (!el || el === SS.root) return;
-      hidden.push([el, el.style.getPropertyValue("visibility"), el.style.getPropertyPriority("visibility")]);
-      el.style.setProperty("visibility", "hidden", "important");
-    };
+    const box = document.createElement("div");
+    box.className = "pick-box";
+    const tip = document.createElement("div");
+    tip.className = "el-tip";
+    SS.shadow.append(canvas, box, tip, hint, dock);
+
+    const hiddenSet = new Set();
+    const steps = [];
+    let climb = 0;
+    let hoverRaw = null;
+
+    function labelOf(el) {
+      if (!el || !el.tagName) return "";
+      const id = el.id ? "#" + el.id : "";
+      const cls = (el.className && typeof el.className === "string")
+        ? "." + el.className.trim().split(/\s+/).slice(0, 2).join(".")
+        : "";
+      return (el.tagName.toLowerCase() + id + cls).slice(0, 48);
+    }
+    function pickRaw(x, y) {
+      SS.root.style.pointerEvents = "none";
+      const el = document.elementFromPoint(x, y);
+      SS.root.style.pointerEvents = "auto";
+      if (!el || el === document.body || el === document.documentElement) return null;
+      if (SS.root && (el === SS.root || SS.root.contains(el))) return null;
+      return el;
+    }
+    function climbTo(el, n) {
+      let t = el;
+      for (let i = 0; i < n && t && t.parentElement; i++) {
+        const p = t.parentElement;
+        if (p === document.body || p === document.documentElement) break;
+        t = p;
+      }
+      return t;
+    }
+    function currentTarget() {
+      return hoverRaw ? climbTo(hoverRaw, climb) : null;
+    }
+    function paintPick() {
+      const el = currentTarget();
+      const btnUndo = dock.querySelector('[data-act="undo"]');
+      if (btnUndo) btnUndo.disabled = !steps.length;
+      const n = steps.reduce((a, s) => a + s.items.length, 0);
+      if (!el) {
+        box.style.display = "none";
+        tip.style.display = "none";
+        hint.textContent = n
+          ? `Скрыто: ${n} · шагов: ${steps.length}. Клик — ещё элемент. Шаг назад — вернуть.`
+          : "Наведите и кликните элемент UI. Шире / Точнее — размер рамки. Sticky / Cookie / Чат — сразу пачкой.";
+        return;
+      }
+      const r = el.getBoundingClientRect();
+      box.style.display = "block";
+      box.style.left = r.left + "px";
+      box.style.top = r.top + "px";
+      box.style.width = Math.max(0, r.width) + "px";
+      box.style.height = Math.max(0, r.height) + "px";
+      tip.style.display = "block";
+      tip.style.left = Math.max(8, r.left) + "px";
+      tip.style.top = Math.max(8, r.top - 22) + "px";
+      tip.textContent = labelOf(el);
+      hint.textContent = `Клик скроет: ${labelOf(el)} · Шире ${climb} · скрыто шагов: ${steps.length}`;
+    }
+    function hideEls(els, name) {
+      const step = [];
+      (els || []).forEach((el) => {
+        if (!el || hiddenSet.has(el) || el === SS.root) return;
+        step.push({
+          el,
+          vis: el.style.getPropertyValue("visibility"),
+          pri: el.style.getPropertyPriority("visibility"),
+        });
+        hiddenSet.add(el);
+        el.style.setProperty("visibility", "hidden", "important");
+      });
+      if (!step.length) return;
+      steps.push({ name, items: step });
+      paintPick();
+    }
+    function undoStep() {
+      const step = steps.pop();
+      if (!step) return;
+      step.items.forEach(({ el, vis, pri }) => {
+        hiddenSet.delete(el);
+        if (vis) el.style.setProperty("visibility", vis, pri);
+        else el.style.removeProperty("visibility");
+      });
+      paintPick();
+    }
+    function restore() {
+      while (steps.length) undoStep();
+    }
     const presets = {
       sticky: () => {
+        const list = [];
         document.querySelectorAll("body *").forEach((el, i) => {
           if (i > 8000) return;
           const p = getComputedStyle(el).position;
-          if (p === "fixed" || p === "sticky") hideEl(el);
+          if (p === "fixed" || p === "sticky") list.push(el);
         });
+        hideEls(list, "sticky");
       },
       cookie: () => {
-        document.querySelectorAll('[id*="cookie" i], [class*="cookie" i], [id*="consent" i], [class*="consent" i], #onetrust-banner-sdk, .cc-window, [id*="gdpr" i]').forEach(hideEl);
+        hideEls(
+          [...document.querySelectorAll('[id*="cookie" i], [class*="cookie" i], [id*="consent" i], [class*="consent" i], #onetrust-banner-sdk, .cc-window, [id*="gdpr" i]')],
+          "cookie"
+        );
       },
       chat: () => {
-        document.querySelectorAll('[class*="intercom" i], [id*="chat" i], [class*="crisp" i], [class*="helpcrunch" i], iframe[title*="chat" i]').forEach(hideEl);
+        hideEls(
+          [...document.querySelectorAll('[class*="intercom" i], [id*="chat" i], [class*="crisp" i], [class*="helpcrunch" i], iframe[title*="chat" i]')],
+          "chat"
+        );
       },
     };
+    function finishHide() {
+      teardown();
+      browser.runtime.sendMessage({ type: "SS_HIDDEN_CAPTURE", pointer: pointerMeta() });
+    }
+
+    window.addEventListener("keydown", (e) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "z") {
+        e.preventDefault();
+        undoStep();
+        return;
+      }
+      if (e.key === "Enter") {
+        e.preventDefault();
+        finishHide();
+        return;
+      }
+      onEsc(e);
+    }, { capture: true, signal: sig });
+
+    canvas.addEventListener("pointermove", (e) => {
+      hoverRaw = pickRaw(e.clientX, e.clientY);
+      paintPick();
+    }, { signal: sig });
     canvas.addEventListener("click", (e) => {
-      SS.root.style.pointerEvents = "none";
-      const el = document.elementFromPoint(e.clientX, e.clientY);
-      SS.root.style.pointerEvents = "auto";
-      hideEl(el);
+      hoverRaw = pickRaw(e.clientX, e.clientY) || hoverRaw;
+      const el = currentTarget();
+      if (el) hideEls([el], "click");
     }, { signal: sig });
     dock.addEventListener("click", (e) => {
       const b = e.target.closest("button");
-      if (!b) return;
+      if (!b || b.disabled) return;
+      if (b.dataset.act === "undo") undoStep();
+      if (b.dataset.act === "wider") { climb += 1; paintPick(); }
+      if (b.dataset.act === "narrower") { climb = Math.max(0, climb - 1); paintPick(); }
       if (presets[b.dataset.act]) presets[b.dataset.act]();
       if (b.dataset.act === "shot") finishHide();
       if (b.dataset.act === "cancel") {
@@ -338,16 +459,7 @@
         teardown();
       }
     });
-    function restore() {
-      hidden.forEach(([el, val, pri]) => {
-        if (val) el.style.setProperty("visibility", val, pri);
-        else el.style.removeProperty("visibility");
-      });
-    }
-    function finishHide() {
-      teardown();
-      browser.runtime.sendMessage({ type: "SS_HIDDEN_CAPTURE", pointer: pointerMeta() });
-    }
+    paintPick();
     window.__SS_RESTORE_HIDE__ = restore;
   }
 
