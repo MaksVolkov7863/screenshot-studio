@@ -98,8 +98,36 @@
         </select>
       </div>
       <div class="row"><label>Тень</label><input type="checkbox" id="shadow"></div>
-      <div class="row"><label>Две стрелки</label><input type="checkbox" id="twoWay"></div>
       <div class="row"><label>Скругление</label><input type="range" id="radius" min="0" max="80" value="16"></div>
+
+      <div id="panelArrow" hidden>
+        <h3>Стрелка</h3>
+        <div class="row"><label>Наконечник</label>
+          <select id="arrowHead">
+            <option value="stealth">Боевой</option>
+            <option value="triangle">Треугольник</option>
+            <option value="open">Открытый</option>
+            <option value="diamond">Ромб</option>
+            <option value="circle">Круг</option>
+            <option value="none">Нет</option>
+          </select>
+        </div>
+        <div class="row"><label>Хвост</label>
+          <select id="arrowTail">
+            <option value="none">Нет</option>
+            <option value="stealth">Боевой</option>
+            <option value="triangle">Треугольник</option>
+            <option value="open">Открытый</option>
+            <option value="diamond">Ромб</option>
+            <option value="circle">Круг</option>
+          </select>
+        </div>
+        <div class="row"><label>Размер головы <span id="headScaleVal">1.0</span></label>
+          <input type="range" id="headScale" min="0.5" max="3" step="0.1" value="1">
+        </div>
+        <div class="row"><label>Две стороны</label><input type="checkbox" id="twoWay"></div>
+        <p class="hint-mini">Потяните оранжевую точку на линии — изгиб. Концы — длина и направление.</p>
+      </div>
 
       <h3>Текст</h3>
       <div class="row"><label>Кегль</label><input type="number" id="fontSize" min="10" max="160" value="28"></div>
@@ -223,7 +251,7 @@
       <span id="statTool">Инструмент: выбор</span>
       <span id="statXY"></span>
       <span class="grow"></span>
-      <span class="desktop-only">Ctrl+Z отмена · Delete удалить · Колёсико масштаб · Пробел панорама</span>
+      <span class="desktop-only">Ctrl+Z отмена · Ctrl+Y / Ctrl+Shift+Z повтор · Delete удалить · Колёсико масштаб · Пробел панорама</span>
       <span class="mobile-only">Инструменты внизу · Стиль — цвет и толщина</span>
     </footer>
   </div>

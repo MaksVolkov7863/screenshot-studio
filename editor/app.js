@@ -41,6 +41,10 @@
       fontWeight: "700",
       italic: false,
       align: "left",
+      twoWay: false,
+      arrowHead: "stealth",
+      arrowTail: "none",
+      headScale: 1,
     },
     nextStep: 1,
     history: new E.History(),
@@ -98,6 +102,9 @@
     if (t === "magnify") {
       toast("Нарисуйте стекло. Оранжевый прицел — какой участок приближать");
     }
+    if (t === "highlight") {
+      toast("Маркер без рамки, пока зажата кнопка. Цвет и прозрачность — только слайдеры справа");
+    }
     refreshPanels();
   }
   function syncToolButtons() {
@@ -146,9 +153,32 @@
       draw();
     };
     $("twoWay").onchange = () => {
+      state.style.twoWay = $("twoWay").checked;
       applyToSelected({ twoWay: $("twoWay").checked });
       draw();
     };
+    if ($("arrowHead")) {
+      $("arrowHead").onchange = () => {
+        state.style.arrowHead = $("arrowHead").value;
+        applyToSelected({ arrowHead: state.style.arrowHead });
+        draw();
+      };
+    }
+    if ($("arrowTail")) {
+      $("arrowTail").onchange = () => {
+        state.style.arrowTail = $("arrowTail").value;
+        applyToSelected({ arrowTail: state.style.arrowTail });
+        draw();
+      };
+    }
+    if ($("headScale")) {
+      $("headScale").oninput = () => {
+        state.style.headScale = +$("headScale").value;
+        if ($("headScaleVal")) $("headScaleVal").textContent = Number(state.style.headScale).toFixed(1);
+        applyToSelected({ headScale: state.style.headScale });
+        draw();
+      };
+    }
     $("radius").oninput = () => {
       applyToSelected({ radius: +$("radius").value });
       draw();
@@ -579,9 +609,19 @@
       o.strokeWidth = 0;
       o.opacity = 1;
     }
+    if (type === "highlight") {
+      o.stroke = (state.style.stroke && state.style.stroke[0] === "#")
+        ? state.style.stroke.slice(0, 7)
+        : (state.style.stroke || "#ffd60a");
+      o.opacity = state.style.opacity == null ? 1 : state.style.opacity;
+    }
     if (type === "arrow" || type === "line") {
       o.cpx = p.x;
       o.cpy = p.y;
+      o.arrowHead = state.style.arrowHead || "stealth";
+      o.arrowTail = state.style.arrowTail || "none";
+      o.headScale = state.style.headScale || 1;
+      o.twoWay = !!state.style.twoWay;
     }
     if (type === "pen" || type === "highlight" || type === "laser") {
       o.smooth = true;
@@ -774,6 +814,17 @@
     const t = o ? o.type : state.tool;
     if ($("panelSpot")) $("panelSpot").hidden = t !== "spotlight";
     if ($("panelMag")) $("panelMag").hidden = t !== "magnify";
+    if ($("panelArrow")) $("panelArrow").hidden = t !== "arrow";
+    if (t === "arrow") {
+      const src = o && o.type === "arrow" ? o : state.style;
+      if ($("arrowHead")) $("arrowHead").value = src.arrowHead || "stealth";
+      if ($("arrowTail")) $("arrowTail").value = src.arrowTail || "none";
+      if ($("headScale")) {
+        $("headScale").value = src.headScale || 1;
+        if ($("headScaleVal")) $("headScaleVal").textContent = Number(src.headScale || 1).toFixed(1);
+      }
+      if ($("twoWay")) $("twoWay").checked = !!src.twoWay;
+    }
     if (o && o.type === "spotlight") {
       $("spotDim").value = Math.round((o.dim != null ? o.dim : 0.68) * 100);
       $("spotDimVal").textContent = $("spotDim").value + "%";
@@ -978,6 +1029,14 @@
 
     for (const o of state.objects) {
       if (o.type === "spotlight") continue;
+      if (
+        state.drag &&
+        state.drag.kind === "create" &&
+        o.type === "highlight" &&
+        o.id === state.selected
+      ) {
+        continue;
+      }
       E.drawObject(ctx, o, filtered);
     }
 
@@ -998,7 +1057,9 @@
     if (window.SSHooks && window.SSHooks.overlay) window.SSHooks.overlay(ctx, cssW, cssH);
 
     const sel = getSelected();
-    if (sel) {
+    const hideChrome = state.drag && state.drag.kind === "create" && sel &&
+      (sel.type === "highlight" || sel.type === "pen" || sel.type === "laser");
+    if (sel && !hideChrome) {
       ctx.save();
       ctx.translate(state.panX, state.panY);
       ctx.scale(state.zoom, state.zoom);
@@ -1081,31 +1142,33 @@
   }
 
   function onKey(e) {
-    if (e.code === "Space") {
+    if (e.target === textEdit) return;
+    const mod = e.ctrlKey || e.metaKey;
+    if (e.code === "Space" && !mod) {
       state.space = true;
       return;
     }
-    if (e.target === textEdit) return;
-    const key = e.key.toLowerCase();
-    if (e.ctrlKey && key === "z") { e.preventDefault(); undo(); }
-    else if (e.ctrlKey && key === "y") { e.preventDefault(); redo(); }
-    else if (e.ctrlKey && key === "s") { e.preventDefault(); saveOut(); }
-    else if (e.ctrlKey && key === "c") { e.preventDefault(); copyOut(); }
-    else if (e.ctrlKey && key === "d") { e.preventDefault(); duplicate(); }
-    else if (e.key === "Delete" || e.key === "Backspace") { e.preventDefault(); delSelected(); }
-    else if (key === "v") setTool("select");
-    else if (key === "g") setTool(state.tool === "pan" ? "select" : "pan");
-    else if (key === "c" && !e.ctrlKey) setTool("crop");
-    else if (key === "p") setTool("pen");
-    else if (key === "h") setTool("highlight");
-    else if (key === "l") setTool("line");
-    else if (key === "a" && !e.ctrlKey) setTool("arrow");
-    else if (key === "r") setTool("rect");
-    else if (key === "o") setTool("ellipse");
-    else if (key === "t") setTool("text");
-    else if (key === "b") setTool("blur");
-    else if (key === "i") setTool("eyedropper");
-    else if (key === "escape") { state.selected = null; textEdit.hidden = true; draw(); }
+    if (mod && e.code === "KeyZ" && e.shiftKey) { e.preventDefault(); redo(); return; }
+    if (mod && e.code === "KeyZ") { e.preventDefault(); undo(); return; }
+    if (mod && e.code === "KeyY") { e.preventDefault(); redo(); return; }
+    if (mod && e.code === "KeyS") { e.preventDefault(); saveOut(); return; }
+    if (mod && e.code === "KeyC") { e.preventDefault(); copyOut(); return; }
+    if (mod && e.code === "KeyD") { e.preventDefault(); duplicate(); return; }
+    if (mod) return;
+    if (e.key === "Delete" || e.key === "Backspace") { e.preventDefault(); delSelected(); }
+    else if (e.code === "KeyV") setTool("select");
+    else if (e.code === "KeyG") setTool(state.tool === "pan" ? "select" : "pan");
+    else if (e.code === "KeyC") setTool("crop");
+    else if (e.code === "KeyP") setTool("pen");
+    else if (e.code === "KeyH") setTool("highlight");
+    else if (e.code === "KeyL") setTool("line");
+    else if (e.code === "KeyA") setTool("arrow");
+    else if (e.code === "KeyR") setTool("rect");
+    else if (e.code === "KeyO") setTool("ellipse");
+    else if (e.code === "KeyT") setTool("text");
+    else if (e.code === "KeyB") setTool("blur");
+    else if (e.code === "KeyI") setTool("eyedropper");
+    else if (e.code === "Escape") { state.selected = null; textEdit.hidden = true; draw(); }
   }
 
   function onPaste(e) {

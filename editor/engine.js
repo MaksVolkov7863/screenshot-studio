@@ -31,6 +31,9 @@
       italic: false,
       align: "left",
       twoWay: false,
+      arrowHead: s.arrowHead || "stealth",
+      arrowTail: s.arrowTail || "none",
+      headScale: s.headScale || 1,
       blur: 12,
       block: 12,
       zoom: 2,
@@ -39,8 +42,16 @@
       src: "",
     };
     if (type === "highlight") {
-      base.stroke = s.stroke || "rgba(255,214,10,0.45)";
-      base.strokeWidth = s.strokeWidth || 22;
+      base.stroke = solidColor(s.stroke) || "#ffd60a";
+      base.strokeWidth = Math.max(14, s.strokeWidth || 22);
+      base.opacity = s.opacity == null ? 1 : s.opacity;
+    }
+    if (type === "arrow") {
+      base.arrowHead = s.arrowHead || "stealth";
+      base.arrowTail = s.arrowTail || "none";
+      base.headScale = s.headScale || 1;
+      base.twoWay = !!s.twoWay;
+      base.strokeWidth = s.strokeWidth || 5;
     }
     if (type === "text" || type === "note" || type === "callout") {
       base.fill = s.fill || (type === "note" ? "#ffe56d" : "rgba(0,0,0,0)");
@@ -318,14 +329,17 @@
           const midX = (x1 + x2) / 2, midY = (y1 + y2) / 2;
           const cpx = o.cpx != null ? o.cpx : midX;
           const cpy = o.cpy != null ? o.cpy : midY;
+          const curved = Math.hypot(cpx - midX, cpy - midY) >= 2;
           ctx.beginPath();
           ctx.moveTo(x1, y1);
-          if (Math.hypot(cpx - midX, cpy - midY) < 2) ctx.lineTo(x2, y2);
-          else ctx.quadraticCurveTo(cpx, cpy, x2, y2);
+          if (curved) ctx.quadraticCurveTo(cpx, cpy, x2, y2);
+          else ctx.lineTo(x2, y2);
           ctx.stroke();
           if (o.type === "arrow") {
-            drawArrowHead(ctx, cpx, cpy, x2, y2, o.strokeWidth);
-            if (o.twoWay) drawArrowHead(ctx, cpx, cpy, x1, y1, o.strokeWidth);
+            const fromHead = curved ? [cpx, cpy] : [x1, y1];
+            const fromTail = curved ? [cpx, cpy] : [x2, y2];
+            drawCap(ctx, fromHead[0], fromHead[1], x2, y2, o, "head");
+            drawCap(ctx, fromTail[0], fromTail[1], x1, y1, o, "tail");
           }
           break;
         }
@@ -333,7 +347,10 @@
         case "highlight":
         case "laser": {
           if (!o.points.length) break;
-          if (o.type === "highlight") ctx.globalCompositeOperation = "multiply";
+          if (o.type === "highlight") {
+            ctx.strokeStyle = solidColor(o.stroke) || o.stroke;
+            ctx.fillStyle = ctx.strokeStyle;
+          }
           if (o.type === "laser") {
             ctx.shadowColor = o.stroke || "#ff2d55";
             ctx.shadowBlur = 18;
@@ -469,16 +486,84 @@
     return lines.length ? lines : [""];
   }
 
-  function drawArrowHead(ctx, x1, y1, x2, y2, sw) {
-    const ang = Math.atan2(y2 - y1, x2 - x1);
-    const len = 10 + sw * 1.8;
+  function capKind(o, end) {
+    if (end === "head") return o.arrowHead || "stealth";
+    if (o.arrowTail && o.arrowTail !== "none") return o.arrowTail;
+    if (o.twoWay) return o.arrowHead || "stealth";
+    return "none";
+  }
+
+  function drawCap(ctx, fx, fy, tx, ty, o, end) {
+    const kind = capKind(o, end);
+    if (!kind || kind === "none") return;
+    const ang = Math.atan2(ty - fy, tx - fx);
+    const sw = o.strokeWidth || 4;
+    const len = (10 + sw * 1.8) * (o.headScale || 1);
+    const col = solidColor(o.stroke) || o.stroke || "#ff3b30";
+    ctx.save();
+    ctx.fillStyle = col;
+    ctx.strokeStyle = col;
+    ctx.lineJoin = "round";
+    ctx.lineCap = "round";
+    ctx.setLineDash([]);
+    if (kind === "circle") {
+      ctx.beginPath();
+      ctx.arc(tx, ty, Math.max(3, sw * 1.15 * (o.headScale || 1)), 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+      return;
+    }
+    const left = (a) => [tx - len * Math.cos(ang - a), ty - len * Math.sin(ang - a)];
+    const right = (a) => [tx - len * Math.cos(ang + a), ty - len * Math.sin(ang + a)];
+    if (kind === "open") {
+      const a = left(0.5), b = right(0.5);
+      ctx.lineWidth = Math.max(2, sw * 0.9);
+      ctx.beginPath();
+      ctx.moveTo(a[0], a[1]);
+      ctx.lineTo(tx, ty);
+      ctx.lineTo(b[0], b[1]);
+      ctx.stroke();
+      ctx.restore();
+      return;
+    }
     ctx.beginPath();
-    ctx.moveTo(x2, y2);
-    ctx.lineTo(x2 - len * Math.cos(ang - 0.45), y2 - len * Math.sin(ang - 0.45));
-    ctx.lineTo(x2 - len * Math.cos(ang + 0.45), y2 - len * Math.sin(ang + 0.45));
+    ctx.moveTo(tx, ty);
+    if (kind === "diamond") {
+      const back = [tx - len * Math.cos(ang), ty - len * Math.sin(ang)];
+      const a = left(0.7), b = right(0.7);
+      ctx.lineTo(a[0], a[1]);
+      ctx.lineTo(back[0], back[1]);
+      ctx.lineTo(b[0], b[1]);
+    } else if (kind === "triangle") {
+      const a = left(0.45), b = right(0.45);
+      ctx.lineTo(a[0], a[1]);
+      ctx.lineTo(b[0], b[1]);
+    } else {
+      const a = left(0.38), b = right(0.38);
+      const notch = [tx - len * 0.55 * Math.cos(ang), ty - len * 0.55 * Math.sin(ang)];
+      ctx.lineTo(a[0], a[1]);
+      ctx.lineTo(notch[0], notch[1]);
+      ctx.lineTo(b[0], b[1]);
+    }
     ctx.closePath();
-    ctx.fillStyle = ctx.strokeStyle;
     ctx.fill();
+    ctx.restore();
+  }
+
+  function solidColor(c) {
+    if (!c) return "";
+    const s = String(c);
+    if (s[0] === "#") {
+      let h = s.slice(1);
+      if (h.length === 3) h = h[0] + h[0] + h[1] + h[1] + h[2] + h[2];
+      return "#" + h.slice(0, 6);
+    }
+    const m = s.match(/(\d+)\s*,\s*(\d+)\s*,\s*(\d+)/);
+    if (m) {
+      const hex = [m[1], m[2], m[3]].map((n) => Number(n).toString(16).padStart(2, "0")).join("");
+      return "#" + hex;
+    }
+    return s;
   }
 
   E.pointInObject = function (o, x, y) {
@@ -519,6 +604,11 @@
       return [
         { id: "p1", x: o.x, y: o.y },
         { id: "p2", x: o.x + o.w, y: o.y + o.h },
+        {
+          id: "cp",
+          x: o.cpx != null ? o.cpx : o.x + o.w / 2,
+          y: o.cpy != null ? o.cpy : o.y + o.h / 2,
+        },
       ];
     }
     const hs = [
@@ -535,13 +625,6 @@
     if (o.type === "magnify") {
       const src = E.magSource(o);
       hs.push({ id: "src", x: src.x, y: src.y });
-    }
-    if (o.type === "arrow" || o.type === "line") {
-      hs.push({
-        id: "cp",
-        x: o.cpx != null ? o.cpx : o.x + o.w / 2,
-        y: o.cpy != null ? o.cpy : o.y + o.h / 2,
-      });
     }
     if (o.type === "callout") {
       hs.push({
