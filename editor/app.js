@@ -103,7 +103,7 @@
       toast("Нарисуйте стекло. Оранжевый прицел — какой участок приближать");
     }
     if (t === "highlight") {
-      toast("Маркер без рамки, пока зажата кнопка. Цвет и прозрачность — только слайдеры справа");
+      toast("Маркер рисуется сразу. Рамка выделения появится, когда отпустите кнопку");
     }
     refreshPanels();
   }
@@ -1029,14 +1029,6 @@
 
     for (const o of state.objects) {
       if (o.type === "spotlight") continue;
-      if (
-        state.drag &&
-        state.drag.kind === "create" &&
-        o.type === "highlight" &&
-        o.id === state.selected
-      ) {
-        continue;
-      }
       E.drawObject(ctx, o, filtered);
     }
 
